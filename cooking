@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>料理ゲーム</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #tabs button { padding: 10px; cursor: pointer; }
+    .tab-content { display: none; padding: 20px; }
+    .active { display: block; }
+    button { margin: 5px; }
+    #global-status { position: fixed; top: 0; right: 10px; background: #fff; padding: 5px; border: 1px solid #ccc; z-index: 1000; }
+  </style>
+</head>
+<body>
+  <div id="global-status">所持金: <span id="money">100</span>G</div>
+
+  <div id="tabs">
+    <button onclick="showTab('farm')">🌱 農業</button>
+    <button onclick="showTab('cook')">🍳 料理</button>
+    <button onclick="showTab('shop')">🏪 販売</button>
+    <button onclick="showTab('quest')">📜 クエスト</button>
+    <button onclick="showTab('market')">🛒 ショップ</button>
+  </div>
+
+  <div id="farm" class="tab-content active">
+    <h2>🌱 農業</h2>
+    <label>作物を選ぶ:</label>
+    <select id="cropSelect"></select>
+    <button onclick="plantCrop()">種をまく（10G）</button>
+    <p>土地の広さ: <span id="landSize">5</span> / 現在の作物数: <span id="cropCount">0</span></p>
+    <ul id="crops"></ul>
+    <h3>📦 収穫箱</h3>
+    <ul id="harvestBox"></ul>
+  </div>
+
+  <div id="cook" class="tab-content">
+    <h2>🍳 料理</h2>
+    <label>レシピを選ぶ:</label>
+    <select id="recipeSelect"></select>
+    <button onclick="cook()">調理</button>
+    <div id="ingredientInfo"></div>
+    <h3>📦 収穫箱</h3>
+    <ul id="harvestBoxCook"></ul>
+    <h3>🍽️ 料理在庫</h3>
+    <ul id="dishInventory"></ul>
+  </div>
+
+  <div id="shop" class="tab-content">
+    <h2>🏪 販売</h2>
+    <label>売る料理を選ぶ:</label>
+    <select id="sellRecipeSelect"></select>
+    <button onclick="putOnShelf()">商品棚に置く</button>
+    <p>商品棚: <span id="shelfCount">0</span></p>
+    <ul id="shelfList"></ul>
+  </div>
+
+  <div id="quest" class="tab-content">
+    <h2>📜 クエスト</h2>
+    <ul id="quests"></ul>
+  </div>
+
+  <div id="market" class="tab-content">
+    <h2>🛒 ショップ</h2>
+    <button onclick="buyLand()">土地拡張（100G + α）</button>
+    <button onclick="buyTool('ジョウロ')">ジョウロ購入（150G）</button>
+    <button onclick="buyCrop('トマト')">トマトの種（100G）</button>
+    <button onclick="buyRecipe('サラダ')">レシピ本『サラダ』（200G）</button>
+  </div>
+
+  <script>
+    let money = 100;
+    let landSize = 5;
+    let crops = [];
+    let harvestBox = {};
+    let dishInventory = {};
+    let shelf = [];
+    let quests = [];
+    let tools = [];
+    let unlockedCrops = ['野菜'];
+    let unlockedRecipes = ['焼き野菜'];
+    let growthBonus = 0;
+
+    
+
+    const recipeData = {
+      '焼き野菜': {
+        ingredients: { '野菜': 1 },
+        rewardPerDish: 25,
+        sellPrice: 20
+      },
+      'サラダ': {
+        ingredients: { '野菜': 1, 'トマト': 1 },
+        rewardPerDish: 55,
+        sellPrice: 45
+      }
+    };
+
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function plantCrop() {
+      const select = document.getElementById('cropSelect');
+      const type = select.value;
+      if (!unlockedCrops.includes(type)) return;
+      if (money >= 10 && crops.length < landSize) {
+        money -= 10;
+        crops.push({ type, growth: 0, maxGrowth: 5 });
+        updateUI();
+      }
+    }
+
+    function growCrops() {
+      crops.forEach(c => {
+        if (c.growth < c.maxGrowth) {
+          c.growth = Math.min(c.growth + 1 + growthBonus, c.maxGrowth);
+        }
+      });
+      const ready = crops.filter(c => c.growth >= c.maxGrowth);
+      for (const c of ready) {
+        harvestBox[c.type] = (harvestBox[c.type] || 0) + 1;
+      }
+      crops = crops.filter(c => c.growth < c.maxGrowth);
+    }
+
+    function cook() {
+      const type = document.getElementById('recipeSelect').value;
+      const recipe = recipeData[type];
+      if (!recipe || !unlockedRecipes.includes(type)) return;
+
+      let canCook = Object.entries(recipe.ingredients).every(([crop, count]) =>
+        (harvestBox[crop] || 0) >= count
+      );
+
+      if (canCook) {
+        for (const [crop, count] of Object.entries(recipe.ingredients)) {
+          harvestBox[crop] -= count;
+        }
+        dishInventory[type] = (dishInventory[type] || 0) + 1;
+        updateUI();
+      }
+    }
+
+    function putOnShelf() {
+      const type = document.getElementById('sellRecipeSelect').value;
+      if ((dishInventory[type] || 0) > 0) {
+        dishInventory[type]--;
+        shelf.push(type);
+        updateUI();
+      }
+    }
+
+    function sellFromShelf() {
+      if (shelf.length > 0 && Math.random() < 0.05) {
+        const sold = shelf.shift();
+        const price = recipeData[sold]?.sellPrice || 20;
+        money += price;
+      }
+    }
+
+    function updateQuests() {
+      const list = document.getElementById('quests');
+      list.innerHTML = quests.map(q =>
+        `<li>${q.recipeName} ${q.dishNeed}個 → ${q.reward}G <button onclick="completeQuest(${q.id})">納品</button></li>`
+      ).join('');
+    }
+
+    function generateQuest() {
+      const recipeName = unlockedRecipes[Math.floor(Math.random() * unlockedRecipes.length)];
+      const recipe = recipeData[recipeName];
+      const dishNeed = Math.floor(Math.random() * 3) + 1;
+      const reward = dishNeed * recipe.rewardPerDish;
+      const id = Date.now();
+      quests.push({id, dishNeed, reward, recipeName});
+      updateQuests();
+    }
+
+    function completeQuest(id) {
+      const q = quests.find(q => q.id === id);
+      if ((dishInventory[q.recipeName] || 0) >= q.dishNeed) {
+        dishInventory[q.recipeName] -= q.dishNeed;
+        money += q.reward;
+        quests = quests.filter(q0 => q0.id !== id);
+        updateUI();
+        updateQuests();
+      }
+    }
+
+    function buyLand() {
+      const cost = 100 + landSize * 10;
+      if (money >= cost) {
+        money -= cost;
+        landSize += 5;
+        updateUI();
+      }
+    }
+
+    function buyTool(name) {
+      if (money >= 150 && !tools.includes(name)) {
+        money -= 150;
+        tools.push(name);
+        if (name === 'ジョウロ') growthBonus = 1;
+        updateUI();
+      }
+    }
+
+    function buyCrop(name) {
+      if (money >= 100 && !unlockedCrops.includes(name)) {
+        money -= 100;
+        unlockedCrops.push(name);
+        updateUI();
+      }
+    }
+
+    function buyRecipe(name) {
+      if (money >= 200 && !unlockedRecipes.includes(name)) {
+        money -= 200;
+        unlockedRecipes.push(name);
+        updateUI();
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('money').textContent = money;
+      document.getElementById('landSize').textContent = landSize;
+      document.getElementById('cropCount').textContent = crops.length;
+
+      document.getElementById('crops').innerHTML = crops.map(c => `<li>${c.type} - 成長: ${c.growth}/5</li>`).join('');
+
+      const harvestList = Object.entries(harvestBox).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
+      document.getElementById('harvestBox').innerHTML = harvestList;
+      document.getElementById('harvestBoxCook').innerHTML = harvestList;
+
+      const cropSelect = document.getElementById('cropSelect');
+      const selectedCrop = cropSelect.value;
+      cropSelect.innerHTML = unlockedCrops.map(c => `<option value="${c}">${c}</option>`).join('');
+      cropSelect.value = selectedCrop;
+
+      const recipeSelect = document.getElementById('recipeSelect');
+      const selectedRecipe = recipeSelect.value;
+      recipeSelect.innerHTML = unlockedRecipes.map(r => `<option value="${r}">${r}</option>`).join('');
+      recipeSelect.value = selectedRecipe;
+
+      const sellRecipeSelect = document.getElementById('sellRecipeSelect');
+      const selectedSell = sellRecipeSelect.value;
+      sellRecipeSelect.innerHTML = unlockedRecipes.map(r => `<option value="${r}">${r}</option>`).join('');
+      sellRecipeSelect.value = selectedSell;
+
+      const recipe = recipeData[selectedRecipe];
+      const ingredients = Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ');
+      document.getElementById('ingredientInfo').innerText = `必要材料: ${ingredients}`;
+
+      const dishList = Object.entries(dishInventory).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
+      document.getElementById('dishInventory').innerHTML = dishList;
+
+      document.getElementById('shelfCount').textContent = shelf.length;
+      document.getElementById('shelfList').innerHTML = shelf.map(name => `<li>${name} (${recipeData[name]?.sellPrice || 20}G)</li>`).join('');
+    }
+
+
+function saveGame() {
+  const data = {
+    money,
+    landSize,
+    crops,
+    harvestBox,
+    dishInventory,
+    shelf,
+    quests,
+    tools,
+    unlockedCrops,
+    unlockedRecipes,
+    unlockedAdvancedRecipes,
+    seasonings,
+    advancedInventory,
+    growthBonus,
+    currentAdvancedRecipe,
+    currentAdvancedSteps
+  };
+  localStorage.setItem('farmingGameSave', JSON.stringify(data));
+}
+
+function loadGame() {
+  const save = localStorage.getItem('farmingGameSave');
+  if (save) {
+    const data = JSON.parse(save);
+    money = data.money || 100;
+    landSize = data.landSize || 5;
+    crops = data.crops || [];
+    harvestBox = data.harvestBox || {};
+    dishInventory = data.dishInventory || {};
+    shelf = data.shelf || [];
+    quests = data.quests || [];
+    tools = data.tools || [];
+    unlockedCrops = data.unlockedCrops || ['にんじん'];
+    unlockedRecipes = data.unlockedRecipes || ['焼きにんじん'];
+    unlockedAdvancedRecipes = data.unlockedAdvancedRecipes || [];
+    seasonings = data.seasonings || {};
+    advancedInventory = data.advancedInventory || [];
+    growthBonus = data.growthBonus || 0;
+    currentAdvancedRecipe = data.currentAdvancedRecipe || null;
+    currentAdvancedSteps = data.currentAdvancedSteps || [];
+  }
+}
+
+//setInterval(saveGame, 10000); // 10秒おきに自動セーブ
+
+    setInterval(() => {
+      growCrops();
+      sellFromShelf();
+      updateUI();
+    }, 1000);
+
+    setInterval(() => {
+      generateQuest();
+    }, 10000);
+
+    updateUI();
+  </script>
+</body>
+</html>
