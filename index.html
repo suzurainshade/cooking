@@ -21,6 +21,8 @@
     <button onclick="showTab('shop')">🏪 販売</button>
     <button onclick="showTab('quest')">📜 クエスト</button>
     <button onclick="showTab('market')">🛒 ショップ</button>
+    <button onclick="saveGame()">💾 保存</button>
+    <button onclick="loadGame()">📂 読み込み</button>
   </div>
 
   <div id="farm" class="tab-content active">
@@ -80,8 +82,6 @@
     let unlockedCrops = ['野菜'];
     let unlockedRecipes = ['焼き野菜'];
     let growthBonus = 0;
-
-    
 
     const recipeData = {
       '焼き野菜': {
@@ -222,6 +222,64 @@
       }
     }
 
+    function saveGame() {
+      const gameState = {
+        money,
+        landSize,
+        crops,
+        harvestBox,
+        dishInventory,
+        shelf,
+        quests,
+        tools,
+        unlockedCrops,
+        unlockedRecipes,
+        growthBonus
+      };
+      localStorage.setItem('farmingGameSave', JSON.stringify(gameState));
+      alert('ゲームを保存しました！');
+    }
+
+    function autosaveGame() {
+      const gameState = {
+        money,
+        landSize,
+        crops,
+        harvestBox,
+        dishInventory,
+        shelf,
+        quests,
+        tools,
+        unlockedCrops,
+        unlockedRecipes,
+        growthBonus
+      };
+      localStorage.setItem('farmingGameSave', JSON.stringify(gameState));
+    }
+
+    function loadGame() {
+      const savedState = localStorage.getItem('farmingGameSave');
+      if (savedState) {
+        const gameState = JSON.parse(savedState);
+        money = gameState.money || 100;
+        landSize = gameState.landSize || 5;
+        crops = gameState.crops || [];
+        harvestBox = gameState.harvestBox || {};
+        dishInventory = gameState.dishInventory || {};
+        shelf = gameState.shelf || [];
+        quests = gameState.quests || [];
+        tools = gameState.tools || [];
+        unlockedCrops = gameState.unlockedCrops || ['野菜'];
+        unlockedRecipes = gameState.unlockedRecipes || ['焼き野菜'];
+        growthBonus = gameState.growthBonus || 0;
+        updateUI();
+        updateQuests();
+        alert('ゲームを読み込みました！');
+      } else {
+        alert('保存されたゲームデータがありません。');
+      }
+    }
+
     function updateUI() {
       document.getElementById('money').textContent = money;
       document.getElementById('landSize').textContent = landSize;
@@ -249,7 +307,7 @@
       sellRecipeSelect.value = selectedSell;
 
       const recipe = recipeData[selectedRecipe];
-      const ingredients = Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ');
+      const ingredients = recipe ? Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ') : '';
       document.getElementById('ingredientInfo').innerText = `必要材料: ${ingredients}`;
 
       const dishList = Object.entries(dishInventory).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
@@ -259,54 +317,6 @@
       document.getElementById('shelfList').innerHTML = shelf.map(name => `<li>${name} (${recipeData[name]?.sellPrice || 20}G)</li>`).join('');
     }
 
-
-function saveGame() {
-  const data = {
-    money,
-    landSize,
-    crops,
-    harvestBox,
-    dishInventory,
-    shelf,
-    quests,
-    tools,
-    unlockedCrops,
-    unlockedRecipes,
-    unlockedAdvancedRecipes,
-    seasonings,
-    advancedInventory,
-    growthBonus,
-    currentAdvancedRecipe,
-    currentAdvancedSteps
-  };
-  localStorage.setItem('farmingGameSave', JSON.stringify(data));
-}
-
-function loadGame() {
-  const save = localStorage.getItem('farmingGameSave');
-  if (save) {
-    const data = JSON.parse(save);
-    money = data.money || 100;
-    landSize = data.landSize || 5;
-    crops = data.crops || [];
-    harvestBox = data.harvestBox || {};
-    dishInventory = data.dishInventory || {};
-    shelf = data.shelf || [];
-    quests = data.quests || [];
-    tools = data.tools || [];
-    unlockedCrops = data.unlockedCrops || ['にんじん'];
-    unlockedRecipes = data.unlockedRecipes || ['焼きにんじん'];
-    unlockedAdvancedRecipes = data.unlockedAdvancedRecipes || [];
-    seasonings = data.seasonings || {};
-    advancedInventory = data.advancedInventory || [];
-    growthBonus = data.growthBonus || 0;
-    currentAdvancedRecipe = data.currentAdvancedRecipe || null;
-    currentAdvancedSteps = data.currentAdvancedSteps || [];
-  }
-}
-
-//setInterval(saveGame, 10000); // 10秒おきに自動セーブ
-
     setInterval(() => {
       growCrops();
       sellFromShelf();
@@ -315,6 +325,7 @@ function loadGame() {
 
     setInterval(() => {
       generateQuest();
+      autosaveGame();
     }, 10000);
 
     updateUI();
