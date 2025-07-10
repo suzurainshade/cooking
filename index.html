@@ -407,11 +407,15 @@
     <div id="saveStatus"></div>
   </div>
 
-  <div id="pauseModal" style="display: none;">
+ <div id="pauseModal" style="display: none;">
     <div>
       <h2>ゲームを一時停止中</h2>
       <p>すべての進行が停止しています。ゆっくり休憩してください！</p>
-      <button onclick="togglePause()">ゲームを再開</button>
+      <p>バージョン: 2.1.0</p>
+      <div class="button-group">
+        <button onclick="togglePause()">ゲームを再開</button>
+        <button onclick="window.open('https://github.com', '_blank')">GitHubへ</button>
+      </div>
     </div>
   </div>
 
