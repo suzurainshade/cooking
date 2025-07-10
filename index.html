@@ -2,27 +2,255 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cooking</title>
-  <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; }
-    #tabs button { padding: 10px; cursor: pointer; }
-    .tab-content { display: none; padding: 20px; }
-    .active { display: block; }
-    button { margin: 5px; }
-    #global-status { position: fixed; top: 0; right: 10px; background: #fff; padding: 5px; border: 1px solid #ccc; z-index: 1000; }
-  </style>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f9f9f9;
+    color: #333;
+  }
+
+  #global-status {
+    position: relative;
+    margin: 12px auto 6px;
+    text-align: center;
+    width: fit-content;
+    padding: 8px 16px;
+    background: #fcfcfc;
+    border-radius: 8px;
+    border: 1px solid #bbb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    font-weight: bold;
+    color: #222;
+  }
+
+  #tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    background-color: #ffffff;
+    padding: 8px;
+    gap: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  #tabs button {
+    background-color: #f5f5f5;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 15px;
+    cursor: pointer;
+    color: #333;
+    transition: background-color 0.2s, color 0.2s;
+    flex: 1 0 auto;
+    min-width: 90px;
+    position: relative;
+  }
+
+  #tabs button:hover {
+    background-color: #ebebeb;
+  }
+
+  #tabs button.active-tab {
+    background-color: #e0f2e9;
+    font-weight: bold;
+    color: #2d7a4d;
+    border: 1px solid #4CAF50;
+  }
+
+  #tabs button .badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #f44336;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .tab-content {
+    display: none;
+    padding: 20px;
+    max-width: 800px;
+    margin: 20px auto;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  h2 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+  }
+
+  label {
+    font-weight: bold;
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+  }
+
+  select,
+  input[type="number"],
+  input[type="checkbox"] {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 15px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  button {
+    padding: 10px 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    margin: 5px 0;
+    cursor: pointer;
+    font-size: 15px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  button:hover {
+    background-color: #45a049;
+  }
+
+  button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+  }
+
+  ul li {
+    padding: 8px 12px;
+    background-color: #f4f4f4;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 1px solid #ddd;
+    font-size: 15px;
+  }
+
+  #ingredientInfo {
+    background-color: #e8f5e9;
+    padding: 10px 14px;
+    border-left: 4px solid #4CAF50;
+    margin: 10px 0;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  #saveStatus {
+    margin: 10px 0;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+    transition: opacity 0.3s ease;
+  }
+
+  #saveStatus.success {
+    background-color: #e8f5e9;
+    border-left: 4px solid #4CAF50;
+    display: block;
+  }
+
+  #saveStatus.error {
+    background-color: #ffebee;
+    border-left: 4px solid #f44336;
+    display: block;
+  }
+
+  .settings-group {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+  }
+
+  .settings-group p {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  @media (min-width: 601px) {
+    .button-group {
+      flex-direction: row;
+    }
+
+    button {
+      width: auto;
+    }
+
+    select,
+    input[type="number"],
+    input[type="checkbox"] {
+      width: auto;
+    }
+  }
+
+  @media (max-width: 600px) {
+    #tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, auto);
+      gap: 8px;
+    }
+
+    #tabs button {
+      width: 100%;
+      font-size: 14px;
+      padding: 10px;
+    }
+  }
+</style>
 </head>
 <body>
-  <div id="global-status">所持金: <span id="money">100</span>G</div>
+  <div id="global-status">所持金: <span id="money">100</span>G | 経験値: <span id="xp">0</span>XP | 評判: <span id="rp">5.00</span>RP | 電力: <span id="ep">0</span>EP</div>
 
   <div id="tabs">
-    <button onclick="showTab('farm')">🌱 農業</button>
-    <button onclick="showTab('cook')">🍳 料理</button>
-    <button onclick="showTab('shop')">🏪 販売</button>
-    <button onclick="showTab('quest')">📜 クエスト</button>
-    <button onclick="showTab('market')">🛒 ショップ</button>
-    <button onclick="saveGame()">💾 保存</button>
-    <button onclick="loadGame()">📂 読み込み</button>
+    <button id="tab-farm" onclick="showTab('farm')">🌱 農業</button>
+    <button id="tab-cook" onclick="showTab('cook')">🍳 料理</button>
+    <button id="tab-shop" onclick="showTab('shop')">🏪 販売</button>
+    <button id="tab-quest" onclick="showTab('quest')">📜 クエスト</button>
+    <button id="tab-market" onclick="showTab('market')">🛒 ショップ</button>
+    <button id="tab-machines" onclick="showTab('machines')">🚜 農機</button>
+    <button id="tab-power" onclick="showTab('power')">⚡️ 電力</button>
+    <button id="tab-settings" onclick="showTab('settings')">⚙️ 設定</button>
   </div>
 
   <div id="farm" class="tab-content active">
@@ -64,41 +292,262 @@
 
   <div id="market" class="tab-content">
     <h2>🛒 ショップ</h2>
-    <button onclick="buyLand()">土地拡張（100G + α）</button>
-    <button onclick="buyTool('ジョウロ')">ジョウロ購入（150G）</button>
-    <button onclick="buyCrop('トマト')">トマトの種（100G）</button>
-    <button onclick="buyRecipe('サラダ')">レシピ本『サラダ』（200G）</button>
+    <button id="land" onclick="buyLand()">土地拡張（100G + α）</button>
+    <button id="toolWateringCan" onclick="buyTool('ジョウロ')" disabled>ジョウロ購入（150G）- 100XP必要</button>
+    <button id="toolAutoPlanterCabbage" onclick="buyTool('種まき機キャベツ号')" disabled>種まき機キャベツ号購入（3000G）- 700XP必要</button>
+    <button id="toolAutoPlanterTomato" onclick="buyTool('種まき機トマト号')" disabled>種まき機トマト号購入（4000G）- 1200XP必要</button>
+    <button id="toolAutoPlanterCarrot" onclick="buyTool('種まき機ニンジン号')" disabled>種まき機ニンジン号購入（5000G）- 1600XP必要</button>
+    <button id="toolAutoPlanterPotato" onclick="buyTool('種まき機ポテト号')" disabled>種まき機ポテト号購入（7000G）- 2400XP必要</button>
+    <button id="buyPower" onclick="buyPower()" disabled>電力購入（100EP / 200G）- 700XP必要</button>
+    <button id="cropTomato" onclick="buyCrop('トマト')" disabled>トマトの種（100G）- 200XP必要</button>
+    <button id="recipeSalad" onclick="buyRecipe('トマトサラダ')" disabled>レシピ本『トマトサラダ』（200G）- 200XP必要</button>
+    <button id="cropCarrot" onclick="buyCrop('ニンジン')" disabled>ニンジンの種（150G）- 400XP必要</button>
+    <button id="recipeCarrot" onclick="buyRecipe('焼きニンジン')" disabled>レシピ本『焼きニンジン』（200G）- 400XP必要</button>
+    <button id="cropPotato" onclick="buyCrop('ポテト')" disabled>ポテトの種（300G）- 800XP必要</button>
+  </div>
+
+  <div id="machines" class="tab-content">
+    <h2>🚜 農機</h2>
+    <h3>種まき機の稼働設定</h3>
+    <div id="planterControls"></div>
+  </div>
+
+  <div id="power" class="tab-content">
+    <h2>⚡️ 電力</h2>
+    <p>電力購入はショップタブから行えます。</p>
+    <p>将来の発電機能はこちらで管理予定です。</p>
+  </div>
+
+  <div id="settings" class="tab-content">
+    <h2>⚙️ 設定</h2>
+    <div class="settings-group">
+      <h3>保存と読み込み</h3>
+      <div class="button-group">
+        <button onclick="saveGame()">ゲームを保存</button>
+        <button onclick="loadGame()">ゲームを読み込む</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <h3>自動保存設定</h3>
+      <p>ゲームの進行状況を定期的に自動保存します。</p>
+      <label for="autoSaveEnabled">自動保存を有効にする:</label>
+      <input type="checkbox" id="autoSaveEnabled" onchange="toggleAutoSave(); saveSettings()">
+      <label for="autoSaveInterval">自動保存間隔（秒、5以上）:</label>
+      <input type="number" id="autoSaveInterval" min="5" value="10" onchange="updateAutoSaveInterval(); saveSettings()">
+    </div>
+    <div class="settings-group">
+      <h3>自動読み込み設定</h3>
+      <p>ページを開いたときに保存データを自動的に読み込みます。</p>
+      <label for="autoLoadEnabled">ページ読み込み時に自動復元:</label>
+      <input type="checkbox" id="autoLoadEnabled" onchange="saveSettings()">
+    </div>
+    <div id="saveStatus"></div>
   </div>
 
   <script>
     let money = 100;
+    let xp = 0;
+    let rp = 5.0;
+    let ep = 0; // 電力量
     let landSize = 5;
     let crops = [];
     let harvestBox = {};
     let dishInventory = {};
     let shelf = [];
     let quests = [];
-    let tools = [];
-    let unlockedCrops = ['野菜'];
-    let unlockedRecipes = ['焼き野菜'];
+    let tools = { 'ジョウロ': 0, '種まき機キャベツ号': 0, '種まき機トマト号': 0, '種まき機ニンジン号': 0, '種まき機ポテト号': 0 };
+    let activePlanters = { '種まき機キャベツ号': 0, '種まき機トマト号': 0, '種まき機ニンジン号': 0, '種まき機ポテト号': 0 }; // 稼働中の種まき機台数
+    let unlockedCrops = ['キャベツ'];
+    let unlockedRecipes = ['焼きキャベツ'];
     let growthBonus = 0;
+    let seasonings = {};
+    let advancedInventory = [];
+    let currentAdvancedRecipe = null;
+    let currentAdvancedSteps = [];
+    let autoSaveEnabled = true;
+    let autoSaveInterval = 10000; // 10秒（ミリ秒）
+    let autoLoadEnabled = false;
+    let autoSaveTimer = null;
+    let purchasedItems = new Set();
+    let newQuestAvailable = false;
+    let lastPowerConsumption = Date.now(); // 最後の電力消費時刻
 
     const recipeData = {
-      '焼き野菜': {
-        ingredients: { '野菜': 1 },
+      '焼きキャベツ': {
+        ingredients: { 'キャベツ': 1 },
         rewardPerDish: 25,
         sellPrice: 20
       },
-      'サラダ': {
-        ingredients: { '野菜': 1, 'トマト': 1 },
+      'トマトサラダ': {
+        ingredients: { 'キャベツ': 1, 'トマト': 1 },
         rewardPerDish: 55,
         sellPrice: 45
+      },
+      '焼きニンジン': {
+        ingredients: { 'ニンジン': 1 },
+        rewardPerDish: 30,
+        sellPrice: 25
       }
+    };
+
+    const unlockThresholds = {
+      'ジョウロ': 100,
+      'トマト': 200,
+      'トマトサラダ': 200,
+      'ニンジン': 400,
+      '焼きニンジン': 400,
+      'ポテト': 800,
+      '種まき機キャベツ号': 700,
+      '電力購入': 700,
+      '種まき機トマト号': 1200,
+      '種まき機ニンジン号': 1600,
+      '種まき機ポテト号': 2400
     };
 
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
+      if (tabId === 'settings') {
+        document.getElementById('saveStatus').style.display = 'none';
+        updateSettingsUI();
+      }
+      if (tabId === 'quest') {
+        newQuestAvailable = false;
+        updateTabNotifications();
+      }
+      if (tabId === 'machines') {
+        updatePlanterControls();
+      }
+    }
+
+    function addXP(amount) {
+      xp += amount;
+      updateUI();
+    }
+
+    function updateRP(amount) {
+      rp = Math.max(0, Math.min(10, rp + amount));
+      updateUI();
+    }
+
+    function getQuestInterval() {
+      const minInterval = 30000 + (60000 - 30000) * ((rp - 1) / 9);
+      const maxInterval = 70000 + (135000 - 70000) * ((rp - 1) / 9);
+      return Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+    }
+
+    function getSellProbability() {
+      return 0.04 - (0.04 - 0.0167) * ((rp - 1) / 9);
+    }
+
+    function checkUnlocks() {
+      const items = [
+        { id: 'toolWateringCan', name: 'ジョウロ', cost: 150, type: 'tool' },
+        { id: 'toolAutoPlanterCabbage', name: '種まき機キャベツ号', cost: 3000, type: 'tool' },
+        { id: 'toolAutoPlanterTomato', name: '種まき機トマト号', cost: 4000, type: 'tool' },
+        { id: 'toolAutoPlanterCarrot', name: '種まき機ニンジン号', cost: 5000, type: 'tool' },
+        { id: 'toolAutoPlanterPotato', name: '種まき機ポテト号', cost: 7000, type: 'tool' },
+        { id: 'buyPower', name: '電力購入', cost: 200, type: 'power' },
+        { id: 'cropTomato', name: 'トマト', cost: 100, type: 'crop' },
+        { id: 'recipeSalad', name: 'トマトサラダ', cost: 200, type: 'recipe' },
+        { id: 'cropCarrot', name: 'ニンジン', cost: 150, type: 'crop' },
+        { id: 'recipeCarrot', name: '焼きニンジン', cost: 200, type: 'recipe' },
+        { id: 'cropPotato', name: 'ポテト', cost: 300, type: 'crop' }
+      ];
+
+      items.forEach(item => {
+        const button = document.getElementById(item.id);
+        if (button) {
+          if (item.type === 'tool' && item.name.startsWith('種まき機')) {
+            button.style.display = tools[item.name] >= landSize ? 'none' : 'block';
+            button.disabled = xp < unlockThresholds[item.name];
+            button.textContent = xp >= unlockThresholds[item.name]
+              ? `${item.name}購入（${item.cost}G）`
+              : `${item.name}購入（${item.cost}G）- ${unlockThresholds[item.name]}XP必要`;
+          } else if (item.type === 'power') {
+            button.style.display = 'block';
+            button.disabled = xp < unlockThresholds[item.name];
+            button.textContent = xp >= unlockThresholds[item.name]
+              ? `電力購入（100EP / ${item.cost}G）`
+              : `電力購入（100EP / ${item.cost}G）- ${unlockThresholds[item.name]}XP必要`;
+          } else if (purchasedItems.has(item.name)) {
+            button.style.display = 'none';
+          } else {
+            button.style.display = 'block';
+            button.disabled = xp < unlockThresholds[item.name];
+            button.textContent = xp >= unlockThresholds[item.name]
+              ? `${item.name}${item.type === 'tool' ? '購入' : item.type === 'crop' ? 'の種' : 'レシピ本『' + item.name + '』'}（${item.cost}G）`
+              : `${item.name}${item.type === 'tool' ? '購入' : item.type === 'crop' ? 'の種' : 'レシピ本『' + item.name + '』'}（${item.cost}G）- ${unlockThresholds[item.name]}XP必要`;
+          }
+        }
+      });
+    }
+
+    function checkGameOver() {
+      const hasNoItems =
+        Object.keys(harvestBox).length === 0 &&
+        Object.keys(dishInventory).length === 0 &&
+        shelf.length === 0 &&
+        crops.length === 0;
+      if (money < 10 && hasNoItems) {
+        money += 10;
+        showSaveStatus('所持金が不足しています。救済として10Gを付与しました。', true);
+        updateUI();
+      }
+    }
+
+    function checkQuestDeadlines() {
+      const now = Date.now();
+      quests.forEach(q => {
+        const elapsed = (now - q.id) / 1000;
+        if (elapsed > 10 && elapsed <= 30) {
+          updateRP(0.05);
+          if (elapsed >= 30) {
+            showSaveStatus(`クエスト「${q.recipeName} ${q.dishNeed}個」が期限切れで評判が下がりました。`, false);
+          }
+        }
+      });
+      updateQuests();
+    }
+
+    function consumePower() {
+      const now = Date.now();
+      if (now - lastPowerConsumption >= 10000) { // 10秒ごと
+        const totalActive = Object.values(activePlanters).reduce((sum, count) => sum + count, 0);
+        if (totalActive > 0) {
+          if (ep >= totalActive) {
+            ep -= totalActive;
+            lastPowerConsumption = now;
+          } else {
+            Object.keys(activePlanters).forEach(name => activePlanters[name] = 0);
+            showSaveStatus('電力不足で種まき機が停止しました。', false);
+            updatePlanterControls();
+          }
+          updateUI();
+        }
+      }
+    }
+
+    function autoPlant() {
+      const planters = [
+        { name: '種まき機キャベツ号', crop: 'キャベツ' },
+        { name: '種まき機トマト号', crop: 'トマト' },
+        { name: '種まき機ニンジン号', crop: 'ニンジン' },
+        { name: '種まき機ポテト号', crop: 'ポテト' }
+      ];
+      let plantCount = 0;
+      planters.forEach(planter => {
+        const activeCount = activePlanters[planter.name] || 0;
+        for (let i = 0; i < activeCount && money >= 10 && crops.length < landSize && plantCount < landSize; i++) {
+          if (unlockedCrops.includes(planter.crop)) {
+            money -= 10;
+            crops.push({ type: planter.crop, growth: 0, maxGrowth: 5 });
+            addXP(1);
+            plantCount++;
+          }
+        }
+      });
+      updateUI();
     }
 
     function plantCrop() {
@@ -108,6 +557,7 @@
       if (money >= 10 && crops.length < landSize) {
         money -= 10;
         crops.push({ type, growth: 0, maxGrowth: 5 });
+        addXP(1);
         updateUI();
       }
     }
@@ -139,6 +589,7 @@
           harvestBox[crop] -= count;
         }
         dishInventory[type] = (dishInventory[type] || 0) + 1;
+        addXP(1);
         updateUI();
       }
     }
@@ -148,23 +599,35 @@
       if ((dishInventory[type] || 0) > 0) {
         dishInventory[type]--;
         shelf.push(type);
+        addXP(1);
         updateUI();
       }
     }
 
     function sellFromShelf() {
-      if (shelf.length > 0 && Math.random() < 0.05) {
+      if (shelf.length > 0 && Math.random() < getSellProbability()) {
         const sold = shelf.shift();
         const price = recipeData[sold]?.sellPrice || 20;
         money += price;
+        addXP(1);
+        updateRP(-0.04);
+        updateUI();
       }
     }
 
     function updateQuests() {
+      const now = Date.now();
       const list = document.getElementById('quests');
-      list.innerHTML = quests.map(q =>
-        `<li>${q.recipeName} ${q.dishNeed}個 → ${q.reward}G <button onclick="completeQuest(${q.id})">納品</button></li>`
-      ).join('');
+      list.innerHTML = quests.map(q => {
+        const elapsed = Math.floor((now - q.id) / 1000);
+        return `<li>${q.recipeName} ${q.dishNeed}個 → ${q.reward}G（経過時間: ${elapsed}秒） <button onclick="completeQuest(${q.id})">納品</button></li>`;
+      }).join('');
+      updateTabNotifications();
+    }
+
+    function scheduleQuest() {
+      generateQuest();
+      setTimeout(scheduleQuest, getQuestInterval());
     }
 
     function generateQuest() {
@@ -173,7 +636,9 @@
       const dishNeed = Math.floor(Math.random() * 3) + 1;
       const reward = dishNeed * recipe.rewardPerDish;
       const id = Date.now();
-      quests.push({id, dishNeed, reward, recipeName});
+      const deadline = id + 10000;
+      quests.push({ id, dishNeed, reward, recipeName, deadline });
+      newQuestAvailable = true;
       updateQuests();
     }
 
@@ -182,7 +647,12 @@
       if ((dishInventory[q.recipeName] || 0) >= q.dishNeed) {
         dishInventory[q.recipeName] -= q.dishNeed;
         money += q.reward;
+        const elapsed = (Date.now() - q.id) / 1000;
+        if (elapsed <= 10) {
+          updateRP(-0.05);
+        }
         quests = quests.filter(q0 => q0.id !== id);
+        addXP(1);
         updateUI();
         updateQuests();
       }
@@ -198,90 +668,104 @@
     }
 
     function buyTool(name) {
-      if (money >= 150 && !tools.includes(name)) {
-        money -= 150;
-        tools.push(name);
+      if (xp < unlockThresholds[name]) return;
+      const cost = name === '種まき機キャベツ号' ? 3000 :
+                   name === '種まき機トマト号' ? 4000 :
+                   name === '種まき機ニンジン号' ? 5000 :
+                   name === '種まき機ポテト号' ? 7000 : 150;
+      if (name.startsWith('種まき機') && tools[name] >= landSize) return;
+      if (money >= cost) {
+        money -= cost;
+        tools[name] = (tools[name] || 0) + 1;
+        if (!name.startsWith('種まき機')) purchasedItems.add(name);
         if (name === 'ジョウロ') growthBonus = 1;
+        updatePlanterControls();
+        updateUI();
+      }
+    }
+
+    function buyPower() {
+      if (xp < unlockThresholds['電力購入']) return;
+      if (money >= 200) {
+        money -= 200;
+        ep += 100;
         updateUI();
       }
     }
 
     function buyCrop(name) {
-      if (money >= 100 && !unlockedCrops.includes(name)) {
-        money -= 100;
+      if (xp < unlockThresholds[name] || purchasedItems.has(name)) return;
+      const cost = name === 'ニンジン' ? 150 : name === 'ポテト' ? 300 : 100;
+      if (money >= cost && !unlockedCrops.includes(name)) {
+        money -= cost;
         unlockedCrops.push(name);
+        purchasedItems.add(name);
         updateUI();
       }
     }
 
     function buyRecipe(name) {
+      if (xp < unlockThresholds[name] || purchasedItems.has(name)) return;
       if (money >= 200 && !unlockedRecipes.includes(name)) {
         money -= 200;
         unlockedRecipes.push(name);
+        purchasedItems.add(name);
         updateUI();
       }
     }
 
-    function saveGame() {
-      const gameState = {
-        money,
-        landSize,
-        crops,
-        harvestBox,
-        dishInventory,
-        shelf,
-        quests,
-        tools,
-        unlockedCrops,
-        unlockedRecipes,
-        growthBonus
-      };
-      localStorage.setItem('farmingGameSave', JSON.stringify(gameState));
-      alert('ゲームを保存しました！');
+    function updatePlanterControls() {
+      const controls = document.getElementById('planterControls');
+      const planters = [
+        '種まき機キャベツ号',
+        '種まき機トマト号',
+        '種まき機ニンジン号',
+        '種まき機ポテト号'
+      ];
+      controls.innerHTML = planters.map(name => {
+        const owned = tools[name] || 0;
+        if (owned === 0) return '';
+        const options = Array.from({ length: owned + 1 }, (_, i) => i);
+        return `
+          <div style="margin-bottom: 10px;">
+            <label>${name} 稼働台数（所持: ${owned}台）:</label>
+            <select id="planter-${name}" onchange="updateActivePlanter('${name}')">
+              ${options.map(i => `<option value="${i}" ${activePlanters[name] === i ? 'selected' : ''}>${i}台</option>`).join('')}
+            </select>
+          </div>
+        `;
+      }).join('');
     }
 
-    function autosaveGame() {
-      const gameState = {
-        money,
-        landSize,
-        crops,
-        harvestBox,
-        dishInventory,
-        shelf,
-        quests,
-        tools,
-        unlockedCrops,
-        unlockedRecipes,
-        growthBonus
-      };
-      localStorage.setItem('farmingGameSave', JSON.stringify(gameState));
+    function updateActivePlanter(name) {
+      const select = document.getElementById(`planter-${name}`);
+      activePlanters[name] = parseInt(select.value);
+      updateUI();
     }
 
-    function loadGame() {
-      const savedState = localStorage.getItem('farmingGameSave');
-      if (savedState) {
-        const gameState = JSON.parse(savedState);
-        money = gameState.money || 100;
-        landSize = gameState.landSize || 5;
-        crops = gameState.crops || [];
-        harvestBox = gameState.harvestBox || {};
-        dishInventory = gameState.dishInventory || {};
-        shelf = gameState.shelf || [];
-        quests = gameState.quests || [];
-        tools = gameState.tools || [];
-        unlockedCrops = gameState.unlockedCrops || ['野菜'];
-        unlockedRecipes = gameState.unlockedRecipes || ['焼き野菜'];
-        growthBonus = gameState.growthBonus || 0;
-        updateUI();
-        updateQuests();
-        alert('ゲームを読み込みました！');
+    function updateTabNotifications() {
+      const shopTab = document.getElementById('tab-shop');
+      const questTab = document.getElementById('tab-quest');
+
+      if (shelf.length === 0) {
+        shopTab.innerHTML = '🏪 販売<span class="badge">⚠️</span>';
       } else {
-        alert('保存されたゲームデータがありません。');
+        shopTab.innerHTML = '🏪 販売';
+      }
+
+      if (newQuestAvailable && quests.length > 0) {
+        questTab.innerHTML = '📜 クエスト<span class="badge">🔔</span>';
+      } else {
+        questTab.innerHTML = '📜 クエスト';
       }
     }
 
     function updateUI() {
+      document.getElementById('land').innerText = `土地拡張（${100 + landSize * 10}G）`;
       document.getElementById('money').textContent = money;
+      document.getElementById('xp').textContent = xp;
+      document.getElementById('rp').textContent = rp.toFixed(2);
+      document.getElementById('ep').textContent = ep;
       document.getElementById('landSize').textContent = landSize;
       document.getElementById('cropCount').textContent = crops.length;
 
@@ -294,7 +778,7 @@
       const cropSelect = document.getElementById('cropSelect');
       const selectedCrop = cropSelect.value;
       cropSelect.innerHTML = unlockedCrops.map(c => `<option value="${c}">${c}</option>`).join('');
-      cropSelect.value = selectedCrop;
+      cropSelect.value = unlockedCrops.includes(selectedCrop) ? selectedCrop : unlockedCrops[0] || '';
 
       const recipeSelect = document.getElementById('recipeSelect');
       const selectedRecipe = recipeSelect.value;
@@ -306,8 +790,8 @@
       sellRecipeSelect.innerHTML = unlockedRecipes.map(r => `<option value="${r}">${r}</option>`).join('');
       sellRecipeSelect.value = selectedSell;
 
-      const recipe = recipeData[selectedRecipe];
-      const ingredients = recipe ? Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ') : '';
+      const recipe = recipeData[selectedRecipe] || {ingredients: {}};
+      const ingredients = Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ');
       document.getElementById('ingredientInfo').innerText = `必要材料: ${ingredients}`;
 
       const dishList = Object.entries(dishInventory).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
@@ -315,20 +799,219 @@
 
       document.getElementById('shelfCount').textContent = shelf.length;
       document.getElementById('shelfList').innerHTML = shelf.map(name => `<li>${name} (${recipeData[name]?.sellPrice || 20}G)</li>`).join('');
+
+      checkUnlocks();
+      updateTabNotifications();
     }
+
+    function showSaveStatus(message, isSuccess) {
+      const statusDiv = document.getElementById('saveStatus');
+      statusDiv.textContent = message;
+      statusDiv.className = isSuccess ? 'success' : 'error';
+      statusDiv.style.display = 'block';
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 3000);
+    }
+
+    function saveGame() {
+      try {
+        const data = {
+          money,
+          xp,
+          rp,
+          ep,
+          landSize,
+          crops,
+          harvestBox,
+          dishInventory,
+          shelf,
+          quests,
+          tools,
+          activePlanters,
+          unlockedCrops,
+          unlockedRecipes,
+          seasonings,
+          advancedInventory,
+          growthBonus,
+          currentAdvancedRecipe,
+          currentAdvancedSteps,
+          autoSaveEnabled,
+          autoSaveInterval,
+          autoLoadEnabled,
+          purchasedItems: Array.from(purchasedItems),
+          lastPowerConsumption
+        };
+        localStorage.setItem('farmingGameSave', JSON.stringify(data));
+        showSaveStatus('ゲームを保存しました', true);
+      } catch (error) {
+        showSaveStatus('保存に失敗しました', false);
+      }
+    }
+
+    function loadGame() {
+      try {
+        const save = localStorage.getItem('farmingGameSave');
+        if (save) {
+          const data = JSON.parse(save);
+          money = data.money || 100;
+          xp = data.xp || 0;
+          rp = data.rp !== undefined ? data.rp : 5.0;
+          ep = data.ep || 0;
+          landSize = data.landSize || 5;
+          crops = (data.crops || []).map(c => ({
+            ...c,
+            type: c.type === '野菜' || c.type === 'ポテト' ? 'キャベツ' : c.type === 'キャベツ' ? 'ニンジン' : c.type
+          }));
+          harvestBox = Object.fromEntries(
+            Object.entries(data.harvestBox || {}).map(([k, v]) => [
+              k === '野菜' || k === 'ポテト' ? 'キャベツ' : k === 'キャベツ' ? 'ニンジン' : k,
+              v
+            ])
+          );
+          dishInventory = Object.fromEntries(
+            Object.entries(data.dishInventory || {}).map(([k, v]) => [
+              k === '焼き野菜' ? '焼きキャベツ' : k === 'サラダ' ? 'トマトサラダ' : k === 'スープ' ? '焼きニンジン' : k,
+              v
+            ])
+          );
+          shelf = (data.shelf || []).map(s =>
+            s === '焼き野菜' ? '焼きキャベツ' : s === 'サラダ' ? 'トマトサラダ' : s === 'スープ' ? '焼きニンジン' : s
+          );
+          quests = (data.quests || []).map(q => ({
+            ...q,
+            recipeName: q.recipeName === '焼き野菜' ? '焼きキャベツ' : q.recipeName === 'サラダ' ? 'トマトサラダ' : q.recipeName === 'スープ' ? '焼きニンジン' : q.recipeName
+          }));
+          tools = {
+            'ジョウロ': data.tools?.['ジョウロ'] || 0,
+            '種まき機キャベツ号': data.tools?.['種まき機キャベツ号'] || data.tools?.['種まき機ポテト号'] || data.tools?.['自動播種機'] || 0,
+            '種まき機トマト号': data.tools?.['種まき機トマト号'] || 0,
+            '種まき機ニンジン号': data.tools?.['種まき機ニンジン号'] || 0,
+            '種まき機ポテト号': data.tools?.['種まき機ポテト号'] || 0
+          };
+          activePlanters = {
+            '種まき機キャベツ号': data.activePlanters?.['種まき機キャベツ号'] || data.activePlanters?.['種まき機ポテト号'] || data.activePlanters?.['自動播種機'] || 0,
+            '種まき機トマト号': data.activePlanters?.['種まき機トマト号'] || 0,
+            '種まき機ニンジン号': data.activePlanters?.['種まき機ニンジン号'] || 0,
+            '種まき機ポテト号': data.activePlanters?.['種まき機ポテト号'] || 0
+          };
+          unlockedCrops = (data.unlockedCrops || ['キャベツ']).map(c =>
+            c === '野菜' || c === 'ポテト' ? 'キャベツ' : c === 'キャベツ' ? 'ニンジン' : c
+          );
+          unlockedRecipes = (data.unlockedRecipes || ['焼きキャベツ']).map(r =>
+            r === '焼き野菜' ? '焼きキャベツ' : r === 'サラダ' ? 'トマトサラダ' : r === 'スープ' ? '焼きニンジン' : r
+          );
+          seasonings = data.seasonings || {};
+          advancedInventory = data.advancedInventory || [];
+          growthBonus = data.growthBonus || 0;
+          currentAdvancedRecipe = data.currentAdvancedRecipe || null;
+          currentAdvancedSteps = data.currentAdvancedSteps || [];
+          autoSaveEnabled = data.autoSaveEnabled !== undefined ? data.autoSaveEnabled : true;
+          autoSaveInterval = data.autoSaveInterval || 10000;
+          autoLoadEnabled = data.autoLoadEnabled !== undefined ? data.autoLoadEnabled : false;
+          purchasedItems = new Set(
+            (data.purchasedItems || []).map(item =>
+              item === '自動播種機' || item === '種まき機ポテト号' ? '種まき機キャベツ号' : item === 'キャベツ' ? 'ニンジン' : item
+            )
+          );
+          lastPowerConsumption = data.lastPowerConsumption || Date.now();
+          updateSettingsUI();
+          updateUI();
+          updateQuests();
+          updatePlanterControls();
+          startAutoSave();
+          showSaveStatus('ゲームを読み込みました', true);
+        } else {
+          showSaveStatus('保存データが見つかりません', false);
+        }
+      } catch (error) {
+        showSaveStatus('読み込みに失敗しました', false);
+      }
+    }
+
+    function updateSettingsUI() {
+      document.getElementById('autoSaveEnabled').checked = autoSaveEnabled;
+      document.getElementById('autoSaveInterval').value = autoSaveInterval / 1000;
+      document.getElementById('autoLoadEnabled').checked = autoLoadEnabled;
+    }
+
+    function toggleAutoSave() {
+      autoSaveEnabled = document.getElementById('autoSaveEnabled').checked;
+      startAutoSave();
+      saveSettings();
+    }
+
+    function updateAutoSaveInterval() {
+      const input = document.getElementById('autoSaveInterval');
+      let value = parseInt(input.value) * 1000;
+      if (value < 5000) {
+        value = 5000;
+        input.value = 5;
+      }
+      autoSaveInterval = value;
+      startAutoSave();
+      saveSettings();
+    }
+
+    function saveSettings() {
+      try {
+        const data = {
+          autoSaveEnabled,
+          autoSaveInterval,
+          autoLoadEnabled
+        };
+        localStorage.setItem('farmingGameSettings', JSON.stringify(data));
+        showSaveStatus('設定を保存しました', true);
+      } catch (error) {
+        showSaveStatus('設定の保存に失敗しました', false);
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const settings = localStorage.getItem('farmingGameSettings');
+        if (settings) {
+          const data = JSON.parse(settings);
+          autoSaveEnabled = data.autoSaveEnabled !== undefined ? data.autoSaveEnabled : true;
+          autoSaveInterval = data.autoSaveInterval || 10000;
+          autoLoadEnabled = data.autoLoadEnabled !== undefined ? data.autoLoadEnabled : false;
+        }
+      } catch (error) {
+        console.error('設定の読み込みに失敗しました', error);
+      }
+    }
+
+    function startAutoSave() {
+      if (autoSaveTimer) {
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+      if (autoSaveEnabled) {
+        autoSaveTimer = setInterval(saveGame, autoSaveInterval);
+      }
+    }
+
+    loadSettings();
+    updateSettingsUI();
+    startAutoSave();
+    if (autoLoadEnabled) {
+      loadGame();
+    }
+
+    scheduleQuest();
 
     setInterval(() => {
       growCrops();
       sellFromShelf();
+      checkGameOver();
+      checkQuestDeadlines();
+      consumePower();
+      if (shelf.length === 0) {
+        updateRP(0.1);
+      }
+      autoPlant();
       updateUI();
     }, 1000);
-
-    setInterval(() => {
-      generateQuest();
-      autosaveGame();
-    }, 10000);
-
-    updateUI();
   </script>
 </body>
 </html>
