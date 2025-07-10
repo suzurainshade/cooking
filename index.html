@@ -339,7 +339,7 @@
       <h3>自動読み込み設定</h3>
       <p>ページを開いたときに保存データを自動的に読み込みます。</p>
       <label for="autoLoadEnabled">ページ読み込み時に自動復元:</label>
-      <input type="checkbox" id="autoLoadEnabled" onchange="saveSettings()">
+      <input type="checkbox" id="autoLoadEnabled" onchange="toggleAutoLoad()">
     </div>
     <div id="saveStatus"></div>
   </div>
@@ -348,7 +348,7 @@
     let money = 100;
     let xp = 0;
     let rp = 5.0;
-    let ep = 0; // 電力量
+    let ep = 0;
     let landSize = 5;
     let crops = [];
     let harvestBox = {};
@@ -356,7 +356,7 @@
     let shelf = [];
     let quests = [];
     let tools = { 'ジョウロ': 0, '種まき機キャベツ号': 0, '種まき機トマト号': 0, '種まき機ニンジン号': 0, '種まき機ポテト号': 0 };
-    let activePlanters = { '種まき機キャベツ号': 0, '種まき機トマト号': 0, '種まき機ニンジン号': 0, '種まき機ポテト号': 0 }; // 稼働中の種まき機台数
+    let activePlanters = { '種まき機キャベツ号': 0, '種まき機トマト号': 0, '種まき機ニンジン号': 0, '種まき機ポテト号': 0 };
     let unlockedCrops = ['キャベツ'];
     let unlockedRecipes = ['焼きキャベツ'];
     let growthBonus = 0;
@@ -365,12 +365,12 @@
     let currentAdvancedRecipe = null;
     let currentAdvancedSteps = [];
     let autoSaveEnabled = true;
-    let autoSaveInterval = 10000; // 10秒（ミリ秒）
+    let autoSaveInterval = 10000;
     let autoLoadEnabled = false;
     let autoSaveTimer = null;
     let purchasedItems = new Set();
     let newQuestAvailable = false;
-    let lastPowerConsumption = Date.now(); // 最後の電力消費時刻
+    let lastPowerConsumption = Date.now();
 
     const recipeData = {
       '焼きキャベツ': {
@@ -470,10 +470,8 @@
             button.textContent = xp >= unlockThresholds[item.name]
               ? `電力購入（100EP / ${item.cost}G）`
               : `電力購入（100EP / ${item.cost}G）- ${unlockThresholds[item.name]}XP必要`;
-          } else if (purchasedItems.has(item.name)) {
-            button.style.display = 'none';
           } else {
-            button.style.display = 'block';
+            button.style.display = purchasedItems.has(item.name) ? 'none' : 'block';
             button.disabled = xp < unlockThresholds[item.name];
             button.textContent = xp >= unlockThresholds[item.name]
               ? `${item.name}${item.type === 'tool' ? '購入' : item.type === 'crop' ? 'の種' : 'レシピ本『' + item.name + '』'}（${item.cost}G）`
@@ -512,7 +510,7 @@
 
     function consumePower() {
       const now = Date.now();
-      if (now - lastPowerConsumption >= 10000) { // 10秒ごと
+      if (now - lastPowerConsumption >= 10000) {
         const totalActive = Object.values(activePlanters).reduce((sum, count) => sum + count, 0);
         if (totalActive > 0) {
           if (ep >= totalActive) {
@@ -817,6 +815,7 @@
     function saveGame() {
       try {
         const data = {
+          version: '2.1.0',
           money,
           xp,
           rp,
@@ -859,16 +858,25 @@
           rp = data.rp !== undefined ? data.rp : 5.0;
           ep = data.ep || 0;
           landSize = data.landSize || 5;
-          crops = (data.crops || []).map(c => ({
-            ...c,
-            type: c.type === '野菜' || c.type === 'ポテト' ? 'キャベツ' : c.type === 'キャベツ' ? 'ニンジン' : c.type
-          }));
-          harvestBox = Object.fromEntries(
-            Object.entries(data.harvestBox || {}).map(([k, v]) => [
-              k === '野菜' || k === 'ポテト' ? 'キャベツ' : k === 'キャベツ' ? 'ニンジン' : k,
-              v
-            ])
-          );
+
+          // バージョンに応じた作物と収穫箱の変換
+          if (data.version !== '2.1.0') {
+            crops = (data.crops || []).map(c => ({
+              ...c,
+              type: c.type === '野菜' || c.type === 'ポテト' ? 'キャベツ' : c.type === 'キャベツ' ? 'ニンジン' : c.type
+            }));
+            harvestBox = Object.fromEntries(
+              Object.entries(data.harvestBox || {}).map(([k, v]) => [
+                k === '野菜' || k === 'ポテト' ? 'キャベツ' : k === 'キャベツ' ? 'ニンジン' : k,
+                v
+              ])
+            );
+          } else {
+            crops = data.crops || [];
+            harvestBox = data.harvestBox || {};
+          }
+
+          // レシピと棚の変換（旧データのみ）
           dishInventory = Object.fromEntries(
             Object.entries(data.dishInventory || {}).map(([k, v]) => [
               k === '焼き野菜' ? '焼きキャベツ' : k === 'サラダ' ? 'トマトサラダ' : k === 'スープ' ? '焼きニンジン' : k,
@@ -882,6 +890,8 @@
             ...q,
             recipeName: q.recipeName === '焼き野菜' ? '焼きキャベツ' : q.recipeName === 'サラダ' ? 'トマトサラダ' : q.recipeName === 'スープ' ? '焼きニンジン' : q.recipeName
           }));
+
+          // ツールの変換
           tools = {
             'ジョウロ': data.tools?.['ジョウロ'] || 0,
             '種まき機キャベツ号': data.tools?.['種まき機キャベツ号'] || data.tools?.['種まき機ポテト号'] || data.tools?.['自動播種機'] || 0,
@@ -895,12 +905,19 @@
             '種まき機ニンジン号': data.activePlanters?.['種まき機ニンジン号'] || 0,
             '種まき機ポテト号': data.activePlanters?.['種まき機ポテト号'] || 0
           };
-          unlockedCrops = (data.unlockedCrops || ['キャベツ']).map(c =>
-            c === '野菜' || c === 'ポテト' ? 'キャベツ' : c === 'キャベツ' ? 'ニンジン' : c
-          );
+
+          // 解放済み作物とレシピの変換（旧データのみ）
+          if (data.version !== '2.1.0') {
+            unlockedCrops = (data.unlockedCrops || ['キャベツ']).map(c =>
+              c === '野菜' || c === 'ポテト' ? 'キャベツ' : c === 'キャベツ' ? 'ニンジン' : c
+            );
+          } else {
+            unlockedCrops = data.unlockedCrops || ['キャベツ'];
+          }
           unlockedRecipes = (data.unlockedRecipes || ['焼きキャベツ']).map(r =>
             r === '焼き野菜' ? '焼きキャベツ' : r === 'サラダ' ? 'トマトサラダ' : r === 'スープ' ? '焼きニンジン' : r
           );
+
           seasonings = data.seasonings || {};
           advancedInventory = data.advancedInventory || [];
           growthBonus = data.growthBonus || 0;
@@ -938,6 +955,11 @@
     function toggleAutoSave() {
       autoSaveEnabled = document.getElementById('autoSaveEnabled').checked;
       startAutoSave();
+      saveSettings();
+    }
+
+    function toggleAutoLoad() {
+      autoLoadEnabled = document.getElementById('autoLoadEnabled').checked;
       saveSettings();
     }
 
