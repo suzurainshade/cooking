@@ -490,7 +490,7 @@
     <div>
       <h2>ゲームを一時停止中</h2>
       <p>すべての進行が停止しています。<br>ゆっくり休憩してください。</p>
-      <p id="version">バージョン: 2.3.1</p>
+      <p id="version">バージョン: 2.3.2</p>
       <div class="button-group">
         <button onclick="togglePause()">ゲームを再開</button>
         <button onclick="window.open('https://github.com/suzurainshade/cooking/', '_blank')">GitHubへ</button>
@@ -510,7 +510,7 @@
   </div>
 
 <script>
-const version = '2.3.0';
+const version = '2.3.2';
 
 function rearrangeGlobalStatusForMobile() {
   const isMobile = window.innerWidth <= 480;
@@ -1142,6 +1142,10 @@ function checkGameOver() {
 }
 
 function checkQuestDeadlines() {
+  if (isPaused) {
+    console.log('Quest deadlines paused');
+    return;
+  }
   const now = Date.now();
   quests.forEach(q => {
     const elapsed = (now - q.id) / 1000;
@@ -1474,15 +1478,17 @@ function updateActivePlanter(name) {
 function updateTabNotifications() {
   const shopTab = document.getElementById('tab-shop');
   const questTab = document.getElementById('tab-quest');
-  const achievementsTab = document.getElementById('tab-achievements');
-  const managementTab = document.getElementById('tab-management');
-  const machinesTab = document.getElementById('tab-machines');
 
-  shopTab.innerHTML = shelf.length === 0 ? '🏪 販売<span class="badge">⚠️</span>' : '🏪 販売';
-  questTab.innerHTML = newQuestAvailable && quests.length > 0 ? '📜 クエスト<span class="badge">🔔</span>' : '📜 クエスト';
-  achievementsTab.innerHTML = newAchievementAvailable ? '🌟 進捗<span class="badge">🔔</span>' : '🌟 進捗';
-  managementTab.innerHTML = '💼 経営';
-  machinesTab.innerHTML = powerShortage ? '🚜 農機<span class="badge">🔔</span>' : '🚜 農機';
+  // 全店舗の棚に商品が1つ以上あるかチェック
+  const allShelvesHaveItems = Object.values(shelves).every(shelf => shelf.length > 0);
+  shopTab.innerHTML = allShelvesHaveItems ? '🏪 販売' : '🏪 販売<span class="badge">⚠️</span>';
+  
+  if (newQuestAvailable && quests.length > 0) {
+    questTab.innerHTML = '📜 クエスト<span class="badge">🔔</span>';
+  } else {
+    questTab.innerHTML = '📜 クエスト';
+  }
+  console.log('Shelves status:', Object.fromEntries(Object.entries(shelves).map(([id, shelf]) => [id, shelf.length])), 'Notification:', !allShelvesHaveItems);
 }
 
 function updateUI() {
