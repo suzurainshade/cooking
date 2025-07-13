@@ -1880,6 +1880,10 @@ Object.entries(shelves).forEach(([storeId, shelf]) => {
 }, 1000);
 
 setInterval(() => {
+  updateUI();
+}
+
+setInterval(() => {
     if (!isPaused) {
       sellFromShelf();
       autoSell();
