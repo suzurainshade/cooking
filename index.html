@@ -351,7 +351,15 @@
 <body>
   <div id="global-status">
     所持金: <span id="money">100</span>G | 経験値: <span id="xp">0</span>XP | 評判: <span id="rp">5.00</span>RP | 電力: <span id="ep">0</span>EP
-    <button id="pauseButton" onclick="togglePause()">⏸</button>
+    <button id="pauseButton" onclick="togglePause(true)">⏸</button>
+  </div>
+
+  <div id="gameTime">
+    日付: 0日 0時 0分
+  </div>
+
+  <div id="currentWeather">
+    天候: 晴れ
   </div>
 
   <div id="tabs">
@@ -398,6 +406,7 @@
 
   <div id="quest" class="tab-content">
     <h2>📜 クエスト</h2>
+    <ul id="questList"></ul>
     <ul id="quests"></ul>
   </div>
 
@@ -490,9 +499,9 @@
     <div>
       <h2>ゲームを一時停止中</h2>
       <p>すべての進行が停止しています。<br>ゆっくり休憩してください。</p>
-      <p id="version">バージョン: 2.3.2</p>
+      <p id="version">バージョン: 2.5.9</p>
       <div class="button-group">
-        <button onclick="togglePause()">ゲームを再開</button>
+        <button onclick="togglePause(true)">ゲームを再開</button>
         <button onclick="window.open('https://github.com/suzurainshade/cooking/', '_blank')">GitHubへ</button>
       </div>
     </div>
@@ -510,7 +519,13 @@
   </div>
 
 <script>
-const version = '2.3.2';
+const version = '2.5.9';
+
+// 4. 品質選択の拡張用空関数
+function onQualitySelection(type, quality, context) {
+  // 品質選択時のイベント（例：RP変動、お礼）はここに追加
+  // context: 'shelf'（棚に並べる）または 'quest'（クエスト納品）
+}
 
 function rearrangeGlobalStatusForMobile() {
   const isMobile = window.innerWidth <= 480;
@@ -530,7 +545,7 @@ function rearrangeGlobalStatusForMobile() {
         <span>評判: <span id="rp">5.00</span>RP</span>
         <span>電力: <span id="ep">0</span>EP</span>
       </div>
-      <button id="pauseButton" onclick="togglePause()">⏸</button>
+      <button id="pauseButton" onclick="togglePause(true)">⏸</button>
     `;
   } else {
     container.innerHTML = container.dataset.originalHtml;
@@ -589,7 +604,19 @@ let pauseStartTime = null;
 let pauseDuration = 0;
 let nextQuestTime = null;
 let questtimerStart = null;
-const MAX_QUESTS = 3; // クエスト数の上限
+const MAX_QUESTS = 100; // クエスト数の上限
+// 1. グローバル変数の追加（ゲーム内時間、天候、品質）
+let gameTime = { days: 0, hours: 0, minutes: 0 }; // ゲーム内時間
+let lastGameTimeUpdate = Date.now();
+let currentWeather = '晴れ'; // 現在の天候
+let previousWeather = null; // 前日の天候
+let weatherHistory = []; // 天候履歴（前日まで）
+let currentSeason = '春'; // 現在の季節
+let lastWeatherUpdate = 0; // 最後の天候更新時刻
+let pauseStartGameTimeUpdate = 0; // ポーズ開始時のゲーム時間基準
+let activeTab = 'farming';
+// グローバル変数に追加（既存の変数宣言のセクションに）
+let selectedQualities = {}; // 例: { '0': '高品質', '1': '普通' }
 
 let achievements = [
   // 農業（収穫関連）
@@ -670,6 +697,119 @@ updateSettingsUI();
 startAutoSave();
 if (autoLoadEnabled) loadGame();
 updateUI();
+
+// 2. 初期化（農業タブの初期選択）
+function initializeGame() {
+  // 既存の初期化処理（省略）
+  initializeGameTime();
+  activeTab = 'farming'; // 農業タブを初期選択
+  switchTab('farming'); // タブを明示的に選択
+  updateUI();
+}
+
+// 5. タブ切り替え（初期選択の保証）
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.style.display = content.id === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-button').forEach(button => {
+    button.classList.toggle('active', button.getAttribute('onclick') === `switchTab('${tab}')`);
+  });
+  updateUI();
+}
+
+// 2. 初期化（ゲーム内時間の開始）
+function initializeGameTime() {
+  gameTime = { days: 0, hours: 0, minutes: 0 };
+  updateSeason();
+  setWeather();
+}
+
+// 3. ゲーム内時間の更新（ポーズ対応）
+function updateGameTime() {
+  if (!isPaused) {
+    const now = Date.now();
+    const elapsed = now - lastGameTimeUpdate; // 実際の経過時間（ms）
+    const minutesToAdd = Math.floor(elapsed / 250); // 250ms = 1分
+    if (minutesToAdd > 0) {
+      gameTime.minutes += minutesToAdd;
+      lastGameTimeUpdate += minutesToAdd * 250; // 更新時刻を進める
+      while (gameTime.minutes >= 60) {
+        gameTime.minutes -= 60;
+        gameTime.hours += 1;
+        if (gameTime.hours >= 24) {
+          gameTime.hours = 0;
+          gameTime.days += 1;
+          setWeather(); // 毎日天候リセット
+        }
+      }
+      updateSeason();
+      updateUI();
+    }
+  }
+}
+
+// 4. 季節の更新
+function updateSeason() {
+  const month = Math.floor((gameTime.days % 360) / 30) + 1; // 360日で1年
+  if (month >= 3 && month <= 5) currentSeason = '春';
+  else if (month === 6) currentSeason = '6月';
+  else if (month === 7 || month === 8) currentSeason = '夏';
+  else if (month >= 9 && month <= 11) currentSeason = '秋';
+  else currentSeason = '冬';
+}
+
+// 5. 天候の設定
+function setWeather() {
+  const rand = Math.random();
+  let probabilities;
+  if (previousWeather === '蒸し暑い') {
+    probabilities = { 雨: 0.65, 大雨: 0.35 };
+  } else if ((previousWeather === '雨' || previousWeather === '大雨') && (currentSeason === '6月' ? rand < 0.65 : rand < 0.4)) {
+    probabilities = { 雨: 0.65, 大雨: 0.35 };
+  } else {
+    if (currentSeason === '春') {
+      probabilities = { 快晴: 0.30, 晴れ: 0.35, 曇り: 0.20, 蒸し暑い: 0.15 };
+    } else if (currentSeason === '6月') {
+      probabilities = { 快晴: 0.10, 晴れ: 0.15, 曇り: 0.25, 蒸し暑い: 0.50 };
+    } else if (currentSeason === '夏') {
+      probabilities = { 快晴: 0.30, 晴れ: 0.35, 曇り: 0.10, 蒸し暑い: 0.15, 台風: 0.10 };
+    } else if (currentSeason === '秋') {
+      probabilities = { 快晴: 0.15, 晴れ: 0.40, 曇り: 0.25, 蒸し暑い: 0.05, 台風: 0.15 };
+    } else {
+      probabilities = { 快晴: 0.25, 晴れ: 0.50, 曇り: 0.15, 蒸し暑い: 0.10 };
+    }
+  }
+  let cumulative = 0;
+  for (const [weather, prob] of Object.entries(probabilities)) {
+    cumulative += prob;
+    if (rand < cumulative) {
+      weatherHistory.push(currentWeather);
+      if (weatherHistory.length > 1) weatherHistory.shift(); // 前日まで保持
+      currentWeather = weather;
+      previousWeather = currentWeather;
+      break;
+    }
+  }
+}
+
+// 7. 品質点数の計算
+function calculateQualityScore() {
+  let score = 0;
+  switch (currentWeather) {
+    case '快晴': case '晴れ': score += 5; break;
+    case '曇り': score += 3; break;
+    case '雨': score += 4; break;
+    case '大雨': score += 1; break;
+    case '台風': score += 0; break;
+  }
+  if (weatherHistory.includes('雨') || weatherHistory.includes('大雨')) {
+    score += 4;
+  }
+  score += Math.random() * 2;
+  return Math.min(score, 11); // 最大11点
+}
 
 function showTab(tabId) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -756,6 +896,7 @@ function updateShopSubTabs() {
   showShopSubTab(currentStoreId);
 }
 
+// ショップサブタブの表示（品質選択ドロップダウン追加）
 function showShopSubTab(storeId) {
   currentStoreId = storeId;
   document.querySelectorAll('#shop-subtabs button').forEach(btn => btn.classList.remove('active-subtab'));
@@ -764,6 +905,9 @@ function showShopSubTab(storeId) {
   content.innerHTML = `
     <select id="sellRecipeSelect-${storeId}">
       ${unlockedRecipes.map(r => `<option value="${r}">${r}</option>`).join('')}
+    </select>
+    <select id="qualitySelect-${storeId}">
+      <!-- 品質オプションはupdateUIで動的に生成 -->
     </select>
     <button onclick="putOnShelf('${storeId}')">陳列</button>
     <p>棚の数: <span id="shelfCount-${storeId}">0</span></p>
@@ -919,14 +1063,17 @@ function startCampaign() {
   }
 }
 
-function togglePause() {
+function togglePause(toggle) {
+  if (toggle){
   isPaused = !isPaused;
   document.getElementById('pauseModal').style.display = isPaused ? 'flex' : 'none';
   document.getElementById('pauseButton').textContent = isPaused ? '▶' : '⏸';
+  }
 
   if (isPaused) {
     // ポーズ開始: 時刻を記録し、タイマーをクリア
     pauseStartTime = Date.now();
+    pauseStartGameTimeUpdate = lastGameTimeUpdate;
     if (questTimer) {
       clearTimeout(questTimer);
       questTimer = null;
@@ -938,9 +1085,21 @@ function togglePause() {
       pauseDuration += pauseEndTime - pauseStartTime;
       // 既存クエストのdeadlineを延長
       quests.forEach(q => {
-        q.deadline += pauseDuration;
+        q.id += pauseDuration;
       });
+      if (nextQuestTime) {
+        nextQuestTime += pauseDuration;
+        const remainingTime = Math.max(0, nextQuestTime - Date.now());
+        questTimer = setTimeout(scheduleQuest, remainingTime);
+        questTimerStart = Date.now();
+      } else {
+        scheduleQuest();
+      }
+      lastWeatherUpdate += pauseDuration; // ゲーム内時間もポーズ調整
+      //lastGameTimeUpdate += pauseDuration; //時間更新の基準を調整
+      lastGameTimeUpdate = pauseStartGameTimeUpdate;
       pauseStartTime = null;
+      console.log(pauseDuration);
     }
     // タイマーを再スケジュール
     if (nextQuestTime) {
@@ -958,7 +1117,7 @@ function togglePause() {
 
 document.onkeydown = function(e) {
   if (e.key === 'Escape') {
-    togglePause();
+    togglePause(true);
   }
 };
 
@@ -1053,6 +1212,7 @@ function deleteSaveData() {
     isPaused = false;
     document.getElementById('pauseButton').textContent = '⏸';
     lastPowerConsumption = Date.now();
+    gameTime = {days:0,hours:0,minutes:0};
     if (questTimer) {
       clearTimeout(questTimer);
       questTimer = null;
@@ -1083,8 +1243,17 @@ function getQuestInterval() {
   return Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
 }
 
+// 10. 販売確率の天候影響
 function getSellProbability() {
-  return (0.04 - (0.04 - 0.0167) * ((rp - 1) / 9)) * sellProbabilityBonus;
+  let baseProb = 0.04 - (0.04 - 0.0167) * ((rp - 1) / 9);
+  switch (currentWeather) {
+    case '快晴': baseProb *= 1.1; break;
+    case '晴れ': baseProb *= 1.05; break;
+    case '蒸し暑い': baseProb *= 0.95; break;
+    case '雨': case '大雨': baseProb *= 0.9; break;
+    case '台風': baseProb *= 0.8; break;
+  }
+  return baseProb * sellProbabilityBonus;
 }
 
 function checkUnlocks() {
@@ -1196,7 +1365,8 @@ function autoPlant() {
     for (let i = 0; i < activeCount && money >= 10 && crops.length < landSize && plantCount < landSize; i++) {
       if (unlockedCrops.includes(planter.crop)) {
         money -= 10;
-        crops.push({ type: planter.crop, growth: 0, maxGrowth: 5 });
+        const qualityScore = calculateQualityScore();
+        crops.push({ type: planter.crop, growth: 0, maxGrowth: 15, qualityScore });
         planterUses[planter.name] = (planterUses[planter.name] || 0) + 1;
         addXP(1);
         plantCount++;
@@ -1207,47 +1377,77 @@ function autoPlant() {
   updateUI();
 }
 
+// 6. 作物への品質追加（plantCrop, autoPlantの変更）
 function plantCrop() {
   const select = document.getElementById('cropSelect');
   const type = select.value;
   if (!unlockedCrops.includes(type)) return;
   if (money >= 10 && crops.length < landSize) {
     money -= 10;
-    crops.push({ type, growth: 0, maxGrowth: 5 });
+    const qualityScore = calculateQualityScore();
+    crops.push({ type, growth: 0, maxGrowth: 15, qualityScore });
     addXP(1);
     updateUI();
   }
 }
 
+// 8. 収穫時の品質決定
 function growCrops() {
   crops.forEach(c => {
+    let growthRate = 1 + growthBonus;
+    switch (currentWeather) {
+      case '曇り': growthRate -= 0.2; break;
+      case '蒸し暑い': growthRate -= 0.1; break;
+      case '雨': growthRate += 0.3; break;
+      case '大雨': growthRate += 0.5; break;
+      case '台風': growthRate -= 0.5; break;
+    }
     if (c.growth < c.maxGrowth) {
-      c.growth = Math.min(c.growth + 1 + growthBonus, c.maxGrowth);
+      c.growth = Math.min(10*(c.growth) + 10*(growthRate), 10*(c.maxGrowth));
+      console.log(c.growth);
+      c.growth *= 0.1;
+      console.log(c.growth);
     }
   });
   const ready = crops.filter(c => c.growth >= c.maxGrowth);
   for (const c of ready) {
-    harvestBox[c.type] = (harvestBox[c.type] || 0) + 1;
+    const quality = c.qualityScore < 6.7 ? '普通' : c.qualityScore < 9.1 ? '高品質' : 'プレミアム';
+    harvestBox[c.type] = harvestBox[c.type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+    harvestBox[c.type][quality] = (harvestBox[c.type][quality] || 0) + 1;
     harvestCounts[c.type] = (harvestCounts[c.type] || 0) + 1;
     checkAchievements();
   }
   crops = crops.filter(c => c.growth < c.maxGrowth);
 }
 
+// 11. 料理時の品質処理
 function cook() {
   const type = document.getElementById('recipeSelect').value;
   const recipe = recipeData[type];
   if (!recipe || !unlockedRecipes.includes(type)) return;
 
   let canCook = Object.entries(recipe.ingredients).every(([crop, count]) =>
-    (harvestBox[crop] || 0) >= count
+    Object.values(harvestBox[crop] || { 普通: 0, 高品質: 0, プレミアム: 0 }).reduce((sum, v) => sum + v, 0) >= count
   );
 
   if (canCook) {
+    let minQualityScore = Infinity;
     for (const [crop, count] of Object.entries(recipe.ingredients)) {
-      harvestBox[crop] -= count;
+      let remaining = count;
+      for (const quality of ['プレミアム', '高品質', '普通']) {
+        const available = harvestBox[crop]?.[quality] || 0;
+        if (remaining > 0 && available > 0) {
+          const used = Math.min(remaining, available);
+          harvestBox[crop][quality] -= used;
+          const score = quality === '普通' ? 4 : quality === '高品質' ? 7 : 9;
+          minQualityScore = Math.min(minQualityScore, score);
+          remaining -= used;
+        }
+      }
     }
-    dishInventory[type] = (dishInventory[type] || 0) + 1;
+    const quality = minQualityScore < 5 ? '普通' : minQualityScore < 8 ? '高品質' : 'プレミアム';
+    dishInventory[type] = dishInventory[type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+    dishInventory[type][quality] = (dishInventory[type][quality] || 0) + 1;
     cookCounts[type] = (cookCounts[type] || 0) + 1;
     addXP(1);
     checkAchievements();
@@ -1257,22 +1457,30 @@ function cook() {
 
 function putOnShelf(storeId) {
   const type = document.getElementById(`sellRecipeSelect-${storeId}`).value;
-  if ((dishInventory[type] || 0) > 0) {
-    dishInventory[type]--;
-    shelves[storeId].push(type);
+  const quality = document.getElementById(`qualitySelect-${storeId}`).value;
+  const qualities = dishInventory[type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+  if (qualities[quality] > 0) {
+    qualities[quality]--;
+    shelves[storeId].push({ type, quality });
     addXP(1);
+    onQualitySelection(type, quality, 'shelf'); // 拡張用関数呼び出し
     updateUI();
   }
 }
 
+// 9. 売価への影響（sellFromShelf, autoSellの変更）
+// 1. 商品棚のランダム取り出し（sellFromShelfの変更）
 function sellFromShelf() {
   Object.entries(shelves).forEach(([storeId, shelf]) => {
-    if (shelf.length > 0 && Math.random() < (0.04 - (0.04 - 0.0167) * ((rp - 1) / 9))) {
-      const sold = shelf.shift();
-      const price = recipeData[sold]?.sellPrice || 20;
+    if (shelf.length > 0 && Math.random() < getSellProbability()) {
+      const index = Math.floor(Math.random() * shelf.length); // ランダムインデックス
+      const sold = shelf.splice(index, 1)[0]; // ランダムに取り出し
+      let price = recipeData[sold.type]?.sellPrice || 20;
+      if (sold.quality === '高品質') price *= 1.5;
+      if (sold.quality === 'プレミアム') price *= 2;
       money += price;
       totalRevenue += price;
-      saleCounts[sold] = (saleCounts[sold] || 0) + 1;
+      saleCounts[sold.type] = (saleCounts[sold.type] || 0) + 1;
       addXP(1);
       updateRP(-0.04);
       checkAchievements();
@@ -1286,16 +1494,20 @@ function autoSell() {
     if (ep >= autoSellers) {
       ep -= autoSellers;
       totalPowerConsumed += autoSellers;
-      Object.keys(dishInventory).forEach(type => {
-        if (dishInventory[type] > 0 && Math.random() < (1 / (Math.random() * (90 - 60) + 60))) {
-          dishInventory[type]--;
-          const price = recipeData[type]?.sellPrice || 20;
-          money += price;
-          totalRevenue += price;
-          saleCounts[type] = (saleCounts[type] || 0) + 1;
-          addXP(1);
-          checkAchievements();
-        }
+      Object.entries(dishInventory).forEach(([type, qualities]) => {
+        Object.entries(qualities).forEach(([quality, count]) => {
+          if (count > 0 && Math.random() < (1 / (Math.random() * (90 - 60) + 60))) {
+            qualities[quality]--;
+            let price = recipeData[type]?.sellPrice || 20;
+            if (quality === '高品質') price *= 1.5;
+            if (quality === 'プレミアム') price *= 2;
+            money += price;
+            totalRevenue += price;
+            saleCounts[type] = (saleCounts[type] || 0) + 1;
+            addXP(1);
+            checkAchievements();
+          }
+        });
       });
     } else {
       autoSellerActive = false;
@@ -1308,23 +1520,55 @@ function autoSell() {
 }
 
 function updateQuests() {
-  const now = Date.now();
-  const list = document.getElementById('quests');
-  list.innerHTML = quests.map(q => {
-    const elapsed = Math.floor((now - q.id) / 1000);
-    return `<li>${q.recipeName} ${q.dishNeed}個 → ${q.reward}G（経過時間: ${elapsed}秒） <button onclick="completeQuest(${q.id})">納品</button></li>`;
-  }).join('');
-  updateTabNotifications();
+  const questListElement = document.getElementById('questList');
+  if (questListElement) {
+    console.log(`Rendering questList, quests: ${JSON.stringify(quests)}`);
+    const questList = quests
+      .filter(quest => 
+        quest.requirements && 
+        Object.keys(quest.requirements).length > 0 && 
+        Object.keys(quest.requirements).every(type => recipeData[type])
+      )
+      .map(quest => {
+        const requirements = Object.entries(quest.requirements)
+          .map(([type, count]) => `${type || '不明'} x${count || 0}`)
+          .join(', ');
+        const firstType = Object.keys(quest.requirements)[0];
+        const qualities = dishInventory[firstType] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+        const totalAvailable = (qualities.普通 || 0) + (qualities.高品質 || 0) + (qualities.プレミアム || 0);
+        const canComplete = firstType && totalAvailable >= quest.requirements[firstType];
+        const remainingSeconds = Math.max(0, Math.floor((quest.deadline - Date.now()) / 1000));
+        return `
+          <li>
+            ${requirements} (${remainingSeconds}秒)
+            ${canComplete ? '' : '<span>在庫不足</span>'}
+            <button onclick="completeQuest(${quest.id})" ${canComplete ? '' : 'disabled'}>納品</button>
+          </li>
+        `;
+      }).join('');
+    questListElement.innerHTML = questList || '<li>クエストなし</li>';
+  }
 }
 
+// クエストスケジュール
 function scheduleQuest() {
   if (!isPaused) {
     if (questTimer) {
       clearTimeout(questTimer);
       questTimer = null;
     }
-    if (quests.length < MAX_QUESTS) { // クエスト上限
-      generateQuest();
+    // 不正なクエストをクリーニング
+    quests = quests.filter(quest => quest.requirements && Object.keys(quest.requirements).length > 0);
+    console.log(`Cleaned quests: ${JSON.stringify(quests)}`);
+    if (quests.length < MAX_QUESTS) {
+      const quest = generateQuest();
+      if (quest) {
+        quests.push(quest);
+        newQuestAvailable = true;
+        console.log(`Quest added, current quests: ${JSON.stringify(quests)}`);
+      } else {
+        console.warn('Failed to generate quest');
+      }
     }
     const interval = getQuestInterval();
     nextQuestTime = Date.now() + interval;
@@ -1332,46 +1576,115 @@ function scheduleQuest() {
     questTimerStart = Date.now();
     console.log(`Next quest scheduled in ${interval / 1000} seconds`);
   }
+  updateUI();
 }
 
 function generateQuest() {
-  if (unlockedRecipes.length === 0) {
-    console.warn('No unlocked recipes available for quests');
-    return;
+  console.log(`generateQuest called, unlockedRecipes: ${JSON.stringify(unlockedRecipes)}, recipeData: ${JSON.stringify(recipeData)}`);
+  if (!unlockedRecipes || unlockedRecipes.length === 0 || !recipeData) {
+    console.warn('Cannot generate quest: unlockedRecipes or recipeData is empty');
+    return null;
   }
-  if (quests.length >= MAX_QUESTS) {
-    console.log('Quest limit reached, skipping generation');
-    return;
+  const types = Object.keys(recipeData).filter(type => unlockedRecipes.includes(type) && recipeData[type]);
+  if (types.length === 0) {
+    console.warn('No valid recipe types available for quest');
+    return null;
   }
-  const recipeName = unlockedRecipes[Math.floor(Math.random() * unlockedRecipes.length)];
-  const recipe = recipeData[recipeName];
-  const dishNeed = Math.floor(Math.random() * 3) + 1;
-  const reward = dishNeed * recipe.rewardPerDish;
-  const id = Date.now();
-  const deadline = id + 10000; // 10秒後の期限
-  quests.push({ id, dishNeed, reward, recipeName, deadline });
-  newQuestAvailable = true;
-  console.log('Generated quest:', { id, dishNeed, reward, recipeName, deadline }, 'Total quests:', quests.length);
-  updateQuests();
+  const type = types[Math.floor(Math.random() * types.length)];
+  const count = Math.floor(Math.random() * 3) + 1;
+  const requirements = { [type]: count };
+  const quest = {
+    id: Date.now(),
+    requirements,
+    reward: count * (recipeData[type]?.rewardPerDish || 25),
+    deadline: Date.now() + 10000
+  };
+  console.log(`Generated quest: ${JSON.stringify(quest)}`);
+  return quest;
 }
 
-function completeQuest(id) {
-  const q = quests.find(q => q.id === id);
-  if ((dishInventory[q.recipeName] || 0) >= q.dishNeed) {
-    dishInventory[q.recipeName] -= q.dishNeed;
-    money += q.reward;
-    const elapsed = (Date.now() - q.id) / 1000;
-    if (elapsed <= 10) {
-      updateRP(-0.05);
-    }
-    quests = quests.filter(q0 => q0.id !== id);
-    questCompleteCounts[q.recipeName] = (questCompleteCounts[q.recipeName] || 0) + 1;
-    totalQuestCompletes += 1;
-    addXP(1);
-    checkAchievements();
-    updateUI();
-    updateQuests();
+// 3. クエスト納品時の品質選択（completeQuestの追加/変更）
+// 1. クエスト納品（エラーハンドリング追加）
+// クエスト納品（自動品質選択）
+// クエスト納品（デバッグログとエラーチェック強化）
+// クエスト納品
+function completeQuest(questId) {
+  console.log(`completeQuest called with questId: ${questId}`);
+  console.log(`Current quests: ${JSON.stringify(quests)}`);
+  console.log(`Current dishInventory: ${JSON.stringify(dishInventory)}`);
+
+  const quest = quests.find(q => q.id === questId);
+  if (!quest) {
+    console.error(`Quest not found for ID: ${questId}`);
+    showSaveStatus('クエストが見つかりません', false);
+    return;
   }
+
+  // 古い形式のクエストを変換
+  let requirements = quest.requirements;
+  if (!requirements && quest.recipeName && quest.dishNeed) {
+    console.warn(`Converting legacy quest: ${JSON.stringify(quest)}`);
+    requirements = { [quest.recipeName]: quest.dishNeed };
+    quest.requirements = requirements;
+  }
+
+  if (!requirements || Object.keys(requirements).length === 0) {
+    console.error(`Invalid quest requirements: ${JSON.stringify(requirements)}`);
+    showSaveStatus('無効なクエストです', false);
+    quests = quests.filter(q => q.id !== questId);
+    updateUI();
+    return;
+  }
+
+  // 在庫チェック
+  const canComplete = Object.entries(requirements).every(([type, count]) => {
+    const qualities = dishInventory[type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+    const totalAvailable = (qualities.普通 || 0) + (qualities.高品質 || 0) + (qualities.プレミアム || 0);
+    console.log(`Checking type: ${type}, required: ${count}, available: ${totalAvailable}`);
+    return totalAvailable >= count;
+  });
+
+  if (!canComplete) {
+    console.warn(`Cannot complete quest due to insufficient inventory`);
+    showSaveStatus('納品できません：在庫が不足しています', false);
+    return;
+  }
+
+  // 品質を優先順位で消費
+  Object.entries(requirements).forEach(([type, count]) => {
+    const qualities = dishInventory[type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+    let remaining = count;
+    
+    console.log(`Consuming ${type}: required ${count}, before: ${JSON.stringify(qualities)}`);
+    if (remaining > 0 && qualities.普通 > 0) {
+      const used = Math.min(qualities.普通, remaining);
+      qualities.普通 -= used;
+      remaining -= used;
+      if (used > 0) onQualitySelection(type, '普通', 'quest');
+    }
+    if (remaining > 0 && qualities.高品質 > 0) {
+      const used = Math.min(qualities.高品質, remaining);
+      qualities.高品質 -= used;
+      remaining -= used;
+      if (used > 0) onQualitySelection(type, '高品質', 'quest');
+    }
+    if (remaining > 0 && qualities.プレミアム > 0) {
+      const used = Math.min(qualities.プレミアム, remaining);
+      qualities.プレミアム -= used;
+      remaining -= used;
+      if (used > 0) onQualitySelection(type, 'プレミアム', 'quest');
+    }
+    console.log(`After consuming ${type}: ${JSON.stringify(qualities)}`);
+  });
+
+  money += quest.reward;
+  addXP(10);
+  questCompleteCounts[Object.keys(requirements)[0]] = (questCompleteCounts[Object.keys(requirements)[0]] || 0) + 1;
+  totalQuestCompletes += 1;
+  quests = quests.filter(q => q.id !== questId);
+  console.log(`Quest ${questId} completed, new quests: ${JSON.stringify(quests)}`);
+  updateUI();
+  checkAchievements();
 }
 
 function buyLand() {
@@ -1500,9 +1813,11 @@ function updateUI() {
   document.getElementById('landSize').textContent = landSize;
   document.getElementById('cropCount').textContent = crops.length;
 
-  document.getElementById('crops').innerHTML = crops.map(c => `<li>${c.type} - 成長: ${c.growth}/5</li>`).join('');
+  document.getElementById('crops').innerHTML = crops.map(c => `<li>${c.type} - 成長: ${Number(c.growth).toFixed(1)}/15</li>`).join('');
 
-  const harvestList = Object.entries(harvestBox).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
+  const harvestList = Object.entries(harvestBox).map(([crop, qualities]) =>
+    `<li>${crop}: 普通 x${qualities.普通 || 0}, 高品質 x${qualities.高品質 || 0}, プレミアム x${qualities.プレミアム || 0}</li>`
+  ).join('');
   document.getElementById('harvestBox').innerHTML = harvestList;
   document.getElementById('harvestBoxCook').innerHTML = harvestList;
 
@@ -1520,17 +1835,92 @@ function updateUI() {
   const ingredients = Object.entries(recipe.ingredients).map(([k,v]) => `${k} x${v}`).join(', ');
   document.getElementById('ingredientInfo').innerText = `必要材料: ${ingredients}`;
 
-  const dishList = Object.entries(dishInventory).map(([k,v]) => `<li>${k} x ${v}</li>`).join('');
+  const dishList = Object.entries(dishInventory).map(([dish, qualities]) =>
+    `<li>${dish}: 普通 x${qualities.普通 || 0}, 高品質 x${qualities.高品質 || 0}, プレミアム x${qualities.プレミアム || 0}</li>`
+  ).join('');
   document.getElementById('dishInventory').innerHTML = dishList;
 
   // エラーハンドリング
   const shelfCountElement = document.getElementById(`shelfCount-${currentStoreId}`);
   const shelfListElement = document.getElementById(`shelfList-${currentStoreId}`);
-  if (shelfCountElement && shelfListElement && shelves[currentStoreId]) {
-    shelfCountElement.textContent = shelves[currentStoreId].length;
-    shelfListElement.innerHTML = shelves[currentStoreId].map(name => `<li>${name} (${recipeData[name]?.sellPrice || 20}G)</li>`).join('');
-  } else {
-    console.warn(`Shelf elements for store ${currentStoreId} not found or shelves[currentStoreId] is undefined`);
+  if (shelfListElement && shelves[currentStoreId]) {
+    shelfListElement.innerHTML = shelves[currentStoreId].map(item => 
+      `<li>${item.type} (${item.quality}, ${recipeData[item.type]?.sellPrice * (item.quality === '高品質' ? 1.5 : item.quality === 'プレミアム' ? 2 : 1)}G)</li>`
+    ).join('');
+  }
+
+  // 既存の harvestList, dishList, shelfListElement は変更なし
+  document.getElementById('gameTime').textContent = `日付: ${gameTime.days}日 ${gameTime.hours}時 ${gameTime.minutes}分`;
+  document.getElementById('currentWeather').textContent = `天候: ${currentWeather}`;
+  // 既存の harvestList, dishList, shelfListElement の処理はそのまま
+
+  // 棚の品質選択
+// 棚の品質選択（選択状態を保持）
+  Object.keys(shelves).forEach(storeId => {
+    const qualitySelect = document.getElementById(`qualitySelect-${storeId}`);
+    if (qualitySelect) {
+      const type = document.getElementById(`sellRecipeSelect-${storeId}`).value;
+      const qualities = dishInventory[type] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+      const currentQuality = selectedQualities[storeId] || qualitySelect.value || '普通';
+      
+      // 在庫がある品質のみ表示
+      const qualityOptions = Object.keys(qualities)
+        .filter(q => qualities[q] > 0)
+        .map(q => `<option value="${q}" ${q === currentQuality ? 'selected' : ''}>${q}</option>`)
+        .join('') || '<option value="">選択不可</option>';
+      
+      // ドロップダウンの内容を更新（必要時のみ）
+      if (qualitySelect.innerHTML !== qualityOptions) {
+        qualitySelect.innerHTML = qualityOptions;
+      }
+      
+      // 選択値を保持
+      if (qualitySelect.value) {
+        selectedQualities[storeId] = qualitySelect.value;
+      }
+      
+      // onchange イベントを追加（初回のみ）
+      if (!qualitySelect.dataset.listenerAdded) {
+        qualitySelect.addEventListener('change', () => {
+          selectedQualities[storeId] = qualitySelect.value;
+          console.log(`Quality selected for store ${storeId}: ${qualitySelect.value}`);
+        });
+        qualitySelect.dataset.listenerAdded = 'true';
+      }
+    }
+  });
+  
+  // クエスト表示（品質選択を削除）
+  // クエスト表示
+  const questListElement = document.getElementById('questList');
+  if (questListElement) {
+    console.log(`Rendering questList, quests:`, JSON.stringify(quests));
+    const questList = quests
+      .filter(quest => quest.requirements && Object.keys(quest.requirements).length > 0)
+      .map(quest => {
+        const requirements = Object.entries(quest.requirements)
+          .map(([type, count]) => `${type} x${count}`)
+          .join(', ');
+        const firstType = Object.keys(quest.requirements)[0];
+        const qualities = dishInventory[firstType] || { 普通: 0, 高品質: 0, プレミアム: 0 };
+        const totalAvailable = (qualities.普通 || 0) + (qualities.高品質 || 0) + (qualities.プレミアム || 0);
+        const canComplete = totalAvailable >= quest.requirements[firstType];
+        return `
+          <li>
+            ${requirements} (${Math.max(0, Math.floor((quest.deadline - Date.now()) / 1000))}秒)
+            ${canComplete ? '' : '<span>在庫不足</span>'}
+            <button onclick="completeQuest(${quest.id})" ${canComplete ? '' : 'disabled'}>納品</button>
+          </li>
+        `;
+      }).join('');
+    questListElement.innerHTML = questList || '<li>クエストなし</li>';
+  }
+  
+  // 棚の表示
+  if (shelfListElement && shelves[currentStoreId]) {
+    shelfListElement.innerHTML = shelves[currentStoreId].map(item => 
+      `<li>${item.type} (${item.quality}, ${recipeData[item.type]?.sellPrice * (item.quality === '高品質' ? 1.5 : item.quality === 'プレミアム' ? 2 : 1)}G)</li>`
+    ).join('');
   }
 
   checkUnlocks();
@@ -1538,6 +1928,7 @@ function updateUI() {
   updateTabNotifications();
   updateManagementDashboard();
 }
+
 
 function showSaveStatus(message, isSuccess) {
   const statusDiv = document.getElementById('saveStatus');
@@ -1601,66 +1992,14 @@ function saveGame() {
       landExpansions,
       sellIntervalReduction,
       campaignEndTime,
-      powerShortage
-    };
-    localStorage.setItem('farmingGameSave', JSON.stringify(data));
-    showSaveStatus('ゲームを保存しました', true);
-  } catch (error) {
-    showSaveStatus('保存に失敗しました', false);
-  }
-}function saveGame() {
-  try {
-    const data = {
-      version: version,
-      money,
-      xp,
-      rp,
-      ep,
-      landSize,
-      crops: crops.filter(c => unlockedCrops.includes(c.type)),
-      harvestBox: Object.fromEntries(
-        Object.entries(harvestBox || {}).filter(([k]) => unlockedCrops.includes(k))
-      ),
-      dishInventory,
-      shelves,
-      quests,
-      tools,
-      activePlanters,
-      unlockedCrops,
-      unlockedRecipes,
-      seasonings,
-      advancedInventory,
-      growthBonus,
-      currentAdvancedRecipe,
-      currentAdvancedSteps,
-      autoSaveEnabled,
-      autoSaveInterval,
-      autoLoadEnabled,
-      purchasedItems: Array.from(purchasedItems),
-      lastPowerConsumption,
-      pauseDuration, // 追加
-      nextQuestTime, // 追加
-      achievements,
-      isPaused,
-      currentSubTab,
-      currentStoreId,
-      storeCount,
-      autoSellers,
-      autoSellerActive,
-      harvestCounts,
-      cookCounts,
-      saleCounts,
-      questCompleteCounts,
-      totalQuestCompletes,
-      planterUses,
-      shopPurchaseCounts,
-      totalPowerConsumed,
-      totalRevenue,
-      totalCost,
-      landExpansions,
-      sellIntervalReduction,
-      campaignEndTime,
-      powerShortage
+      powerShortage,
+      gameTime,
+      currentWeather,
+      previousWeather,
+      weatherHistory,
+      currentSeason,
+      lastWeatherUpdate,
+      selectedQualities // 新しく追加
     };
     localStorage.setItem('farmingGameSave', JSON.stringify(data));
     showSaveStatus('ゲームを保存しました', true);
@@ -1674,8 +2013,8 @@ function loadGame() {
     const save = localStorage.getItem('farmingGameSave');
     if (save) {
       const data = JSON.parse(save);
-      if (data.version !== '2.3.0') {
-        autoLoadEnabled = true;
+      if (data.version !== version) {
+        console.warn(`Version mismatch: saved ${data.version}, current ${version}`);
       }
       money = data.money || 100;
       xp = data.xp || 0;
@@ -1698,11 +2037,24 @@ function loadGame() {
       currentStoreId = (data.currentStoreId && shelves[data.currentStoreId]) ? data.currentStoreId : '0';
       autoSellers = data.autoSellers || 0;
       autoSellerActive = data.autoSellerActive !== undefined ? data.autoSellerActive : true;
-      quests = (data.quests || []).map(q => ({
-        ...q,
-        recipeName: q.recipeName === '焼き野菜' ? '焼きキャベツ' : q.recipeName === 'サラダ' ? 'トマトサラダ' : q.recipeName === 'スープ' ? '焼きニンジン' : q.recipeName,
-        deadline: q.deadline + (data.pauseDuration || 0) // ロード時にポーズ期間を反映
-      }));
+      // クエストを新しい形式に変換
+      quests = (data.quests || []).map(q => {
+        const requirements = q.requirements || (q.recipeName && q.dishNeed ? { 
+          [q.recipeName === '焼き野菜' ? '焼きキャベツ' : 
+           q.recipeName === 'サラダ' ? 'トマトサラダ' : 
+           q.recipeName === 'スープ' ? '焼きニンジン' : q.recipeName]: q.dishNeed 
+        } : null);
+        if (!requirements || Object.keys(requirements).length === 0) {
+          console.warn(`Invalid quest in save data: ${JSON.stringify(q)}`);
+          return null;
+        }
+        return {
+          id: q.id,
+          requirements,
+          reward: q.reward || Object.values(requirements)[0] * (recipeData[Object.keys(requirements)[0]]?.rewardPerDish || 25),
+          deadline: q.deadline + (data.pauseDuration || 0)
+        };
+      }).filter(q => q !== null);
       tools = {
         'ジョウロ': data.tools?.['ジョウロ'] || 0,
         '種まき機キャベツ号': data.tools?.['種まき機キャベツ号'] || data.tools?.['自動播種機'] || 0,
@@ -1755,20 +2107,23 @@ function loadGame() {
       isPaused = data.isPaused || false;
       document.getElementById('pauseModal').style.display = isPaused ? 'flex' : 'none';
       document.getElementById('pauseButton').textContent = isPaused ? '▶' : '⏸';
+      gameTime = data.gameTime || { days: 0, hours: 0, minutes: 0 };
+      currentWeather = data.currentWeather || '晴れ';
+      previousWeather = data.previousWeather || null;
+      weatherHistory = data.weatherHistory || [];
+      currentSeason = data.currentSeason || '春';
+      lastWeatherUpdate = data.lastWeatherUpdate || Date.now();
       if (questTimer) {
         clearTimeout(questTimer);
         questTimer = null;
       }
-      if (!isPaused) {
-        // ロード時にタイマーを再スケジュール
-        if (nextQuestTime) {
-          const remainingTime = Math.max(0, nextQuestTime - Date.now());
-          console.log(`Next quest in ${remainingTime / 1000} seconds`);
-          questTimer = setTimeout(scheduleQuest, remainingTime);
-          questTimerStart = Date.now();
-        } else {
-          scheduleQuest();
-        }
+      if (!isPaused && nextQuestTime) {
+        const remainingTime = Math.max(0, nextQuestTime - Date.now());
+        console.log(`Next quest in ${remainingTime / 1000} seconds`);
+        questTimer = setTimeout(scheduleQuest, remainingTime);
+        questTimerStart = Date.now();
+      } else if (!isPaused) {
+        scheduleQuest();
       }
       updateSettingsUI();
       updateAchievementList();
@@ -1780,10 +2135,11 @@ function loadGame() {
     } else {
       showSaveStatus('保存データが見つかりません', false);
       if (!isPaused) {
-        scheduleQuest(); // 初回起動時にタイマー開始
+        scheduleQuest();
       }
     }
   } catch (error) {
+    console.error(`loadGame error: ${error}`);
     showSaveStatus('読み込みに失敗しました: ' + error.message, false);
   }
 }
@@ -1875,19 +2231,18 @@ Object.entries(shelves).forEach(([storeId, shelf]) => {
       sellIntervalReduction = 1;
       showSaveStatus('広告キャンペーンが終了しました。', true);
     }
-    updateUI();
   }
 }, 1000);
 
 setInterval(() => {
+  updateGameTime();
   updateUI();
-}, 100);
+}, 250);
 
 setInterval(() => {
     if (!isPaused) {
       sellFromShelf();
       autoSell();
-      updateUI();
     }
 }, 1000 * sellIntervalReduction); // 広告による間隔短縮を反映
 </script>
